@@ -4,373 +4,142 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>USGS Streamflow Viewer</title>
-
-<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- Fonts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-
   :root {
-    --bg: #0c1117;
-    --surface: #161b22;
-    --surface-raised: #1c2129;
-    --border: #30363d;
-    --text: #e6edf3;
-    --text-muted: #8b949e;
-    --accent: #58a6ff;
-    --accent-dim: #1f6feb;
-    --very-low: #d73a49;
-    --low: #e3943a;
-    --moderate: #3fb950;
-    --high: #58a6ff;
-    --very-high: #bc8cff;
-    --extreme: #f778ba;
-    --radius: 8px;
-    --font: 'DM Sans', -apple-system, sans-serif;
-    --mono: 'JetBrains Mono', monospace;
+    --bg:#0a0a0f;--surface:#100e18;--surface-raised:#161321;
+    --border:#2a2440;--border-glow:#3d2b6b;
+    --text:#d8d0e8;--text-muted:#7a6f96;
+    --accent:#bf5af2;--accent-dim:#7a3aaf;
+    --cyan:#32d9cb;--neon-pink:#ff2d7b;--neon-blue:#4d9dff;--warm-gold:#e8b84b;
+    --flow-1:#ff2d55;--flow-2:#ff6f3c;--flow-3:#e8b84b;
+    --flow-4:#32d9cb;--flow-5:#bf5af2;--flow-6:#ff2d7b;
+    --radius:8px;
+    --font:'DM Sans',-apple-system,sans-serif;
+    --mono:'JetBrains Mono',monospace;
+    --glow-sm:0 0 6px rgba(191,90,242,0.25);
+    --glow-md:0 0 14px rgba(191,90,242,0.3);
   }
+  html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);overflow:hidden}
+  .app{display:grid;grid-template-columns:340px 1fr;grid-template-rows:1fr;height:100vh}
 
-  html, body {
-    height: 100%;
-    font-family: var(--font);
-    background: var(--bg);
-    color: var(--text);
-    overflow: hidden;
+  /* ── Sidebar ───────────────────────── */
+  .sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;z-index:1000;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+  .sidebar-header{padding:20px 20px 16px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(191,90,242,0.06) 0%,transparent 100%)}
+  .sidebar-header h1{font-size:17px;font-weight:700;letter-spacing:-0.3px;display:flex;align-items:center;gap:8px}
+  .sidebar-header h1 .dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);display:inline-block;box-shadow:0 0 8px var(--cyan);animation:pulse 2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--cyan)}50%{opacity:.4;box-shadow:0 0 2px var(--cyan)}}
+  .sidebar-header p{margin-top:6px;font-size:12px;color:var(--text-muted);line-height:1.5}
+  .section{padding:16px 20px;border-bottom:1px solid var(--border)}
+  .section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);margin-bottom:12px}
+
+  /* ── Controls ──────────────────────── */
+  .control-row{display:flex;gap:8px;margin-bottom:10px;align-items:center}
+  .control-row label{font-size:13px;font-weight:500;min-width:50px;color:var(--text-muted)}
+  select,input[type="text"],input[type="number"]{flex:1;background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;font-size:13px;font-family:var(--font);color:var(--text);outline:none;transition:border-color .2s,box-shadow .2s}
+  select:focus,input:focus{border-color:var(--accent);box-shadow:var(--glow-sm)}
+  select option{background:var(--surface)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-raised);color:var(--text);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;width:100%}
+  .btn:hover{background:var(--border);border-color:var(--border-glow)}
+  .btn-primary{background:var(--accent-dim);border-color:var(--accent-dim);color:#fff}
+  .btn-primary:hover{background:var(--accent);box-shadow:var(--glow-md)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn-sm{padding:5px 10px;font-size:11px;width:auto}
+
+  /* ── Toggle ────────────────────────── */
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0}
+  .toggle-row span{font-size:13px}
+  .toggle{position:relative;width:36px;height:20px;cursor:pointer}
+  .toggle input{opacity:0;width:0;height:0}
+  .toggle .slider{position:absolute;inset:0;background:var(--border);border-radius:20px;transition:background .2s}
+  .toggle .slider::before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:var(--text-muted);border-radius:50%;transition:transform .2s,background .2s}
+  .toggle input:checked+.slider{background:var(--accent-dim);box-shadow:var(--glow-sm)}
+  .toggle input:checked+.slider::before{transform:translateX(16px);background:var(--accent)}
+
+  /* ── Legend ─────────────────────────── */
+  .legend-items{display:flex;flex-direction:column;gap:6px}
+  .legend-item{display:flex;align-items:center;gap:10px;font-size:12px}
+  .legend-swatch{width:14px;height:14px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.08)}
+  .legend-label{color:var(--text-muted)}
+  .legend-value{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--text)}
+
+  /* ── Stats ──────────────────────────── */
+  .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .stat-card{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px}
+  .stat-card .stat-value{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--cyan)}
+  .stat-card .stat-label{font-size:11px;color:var(--text-muted);margin-top:2px}
+
+  /* ── Pinned ─────────────────────────── */
+  .pinned-list{display:flex;flex-direction:column;gap:4px}
+  .pinned-item{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface-raised);border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:var(--mono)}
+  .pinned-color{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .pinned-item .pinned-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pinned-remove{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;line-height:1;padding:0 2px;width:auto}
+  .pinned-remove:hover{color:var(--neon-pink)}
+
+  /* ── Status ─────────────────────────── */
+  .status-bar{margin-top:auto;padding:12px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px}
+  .status-bar .spinner{width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:none}
+  .status-bar.loading .spinner{display:block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── Map + Chart ────────────────────── */
+  .map-wrap{position:relative;overflow:hidden;display:flex;flex-direction:column}
+  #map{flex:1;width:100%}
+  .chart-drawer{background:var(--surface);border-top:1px solid var(--border-glow);height:0;overflow:hidden;transition:height .3s ease;position:relative}
+  .chart-drawer.open{height:260px}
+  .chart-header{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid var(--border)}
+  .chart-header h3{font-size:13px;font-weight:600;color:var(--accent)}
+  .chart-body{padding:8px 12px;height:calc(100% - 38px)}
+  .chart-body canvas{width:100%!important;height:100%!important}
+  .chart-placeholder{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px}
+
+  /* ── Leaflet popup ──────────────────── */
+  .leaflet-popup-content-wrapper{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--border-glow)!important;border-radius:var(--radius)!important;box-shadow:0 8px 30px rgba(0,0,0,.6),var(--glow-sm)!important;font-family:var(--font)!important}
+  .leaflet-popup-tip{background:var(--surface)!important}
+  .leaflet-popup-content{margin:12px 14px!important;font-size:13px!important;line-height:1.6!important}
+  .popup-title{font-weight:700;font-size:13px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  .popup-row{display:flex;justify-content:space-between;gap:12px;font-size:12px}
+  .popup-row .k{color:var(--text-muted)}
+  .popup-row .v{font-family:var(--mono);font-weight:500;text-align:right}
+  .popup-flow{margin-top:8px;padding:8px 10px;border-radius:6px;text-align:center;font-family:var(--mono);font-size:16px;font-weight:700}
+  .popup-actions{display:flex;gap:6px;margin-top:8px}
+  .popup-btn{flex:1;padding:5px 8px;font-size:11px;font-family:var(--font);font-weight:600;border-radius:5px;border:1px solid var(--border);background:var(--surface-raised);color:var(--text);cursor:pointer;text-align:center;transition:all .15s;text-decoration:none}
+  .popup-btn:hover{border-color:var(--accent);box-shadow:var(--glow-sm)}
+  .popup-btn-accent{background:var(--accent-dim);border-color:var(--accent-dim);color:#fff}
+
+  /* ── Leaflet controls ───────────────── */
+  .leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border)!important}
+  .leaflet-control-zoom a:hover{background:var(--surface-raised)!important}
+  .leaflet-control-attribution{background:rgba(10,10,15,.85)!important;color:var(--text-muted)!important;font-size:10px!important}
+  .leaflet-control-attribution a{color:var(--accent)!important}
+
+  @media(max-width:768px){
+    .app{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+    .sidebar{max-height:40vh;border-right:none;border-bottom:1px solid var(--border)}
+    .chart-drawer.open{height:200px}
   }
-
-  /* ── Layout ─────────────────────────────── */
-  .app {
-    display: grid;
-    grid-template-columns: 340px 1fr;
-    grid-template-rows: 1fr;
-    height: 100vh;
-  }
-
-  /* ── Sidebar ────────────────────────────── */
-  .sidebar {
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    z-index: 1000;
-  }
-
-  .sidebar-header {
-    padding: 20px 20px 16px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .sidebar-header h1 {
-    font-size: 17px;
-    font-weight: 700;
-    letter-spacing: -0.3px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .sidebar-header h1 .dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--moderate);
-    display: inline-block;
-    animation: pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    0%,100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-
-  .sidebar-header p {
-    margin-top: 6px;
-    font-size: 12px;
-    color: var(--text-muted);
-    line-height: 1.5;
-  }
-
-  .section {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .section-title {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-muted);
-    margin-bottom: 12px;
-  }
-
-  /* ── Controls ───────────────────────────── */
-  .control-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 10px;
-    align-items: center;
-  }
-
-  .control-row label {
-    font-size: 13px;
-    font-weight: 500;
-    min-width: 50px;
-    color: var(--text-muted);
-  }
-
-  select, input[type="text"] {
-    flex: 1;
-    background: var(--surface-raised);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 7px 10px;
-    font-size: 13px;
-    font-family: var(--font);
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.15s;
-  }
-
-  select:focus, input[type="text"]:focus {
-    border-color: var(--accent);
-  }
-
-  select option { background: var(--surface); }
-
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 8px 16px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface-raised);
-    color: var(--text);
-    font-family: var(--font);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
-    width: 100%;
-  }
-
-  .btn:hover { background: var(--border); }
-
-  .btn-primary {
-    background: var(--accent-dim);
-    border-color: var(--accent-dim);
-    color: #fff;
-  }
-
-  .btn-primary:hover { background: var(--accent); }
-
-  .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  /* ── Legend ──────────────────────────────── */
-  .legend-items { display: flex; flex-direction: column; gap: 6px; }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 12px;
-  }
-
-  .legend-swatch {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    border: 2px solid rgba(255,255,255,0.15);
-  }
-
-  .legend-label { color: var(--text-muted); }
-  .legend-value { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--text); }
-
-  /* ── Stats ──────────────────────────────── */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-
-  .stat-card {
-    background: var(--surface-raised);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 10px 12px;
-  }
-
-  .stat-card .stat-value {
-    font-family: var(--mono);
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--accent);
-  }
-
-  .stat-card .stat-label {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 2px;
-  }
-
-  /* ── Status bar ─────────────────────────── */
-  .status-bar {
-    margin-top: auto;
-    padding: 12px 20px;
-    border-top: 1px solid var(--border);
-    font-size: 11px;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .status-bar .spinner {
-    width: 12px; height: 12px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    display: none;
-  }
-
-  .status-bar.loading .spinner { display: block; }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Map ─────────────────────────────────── */
-  .map-wrap {
-    position: relative;
-    overflow: hidden;
-  }
-
-  #map { width: 100%; height: 100%; }
-
-  /* Leaflet popup overrides */
-  .leaflet-popup-content-wrapper {
-    background: var(--surface) !important;
-    color: var(--text) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radius) !important;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.5) !important;
-    font-family: var(--font) !important;
-  }
-
-  .leaflet-popup-tip { background: var(--surface) !important; }
-
-  .leaflet-popup-content {
-    margin: 12px 14px !important;
-    font-size: 13px !important;
-    line-height: 1.6 !important;
-  }
-
-  .popup-title {
-    font-weight: 700;
-    font-size: 13px;
-    margin-bottom: 6px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .popup-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    font-size: 12px;
-  }
-
-  .popup-row .k { color: var(--text-muted); }
-  .popup-row .v { font-family: var(--mono); font-weight: 500; text-align: right; }
-
-  .popup-flow {
-    margin-top: 8px;
-    padding: 8px 10px;
-    border-radius: 6px;
-    text-align: center;
-    font-family: var(--mono);
-    font-size: 16px;
-    font-weight: 700;
-  }
-
-  /* ── Zoom hint ──────────────────────────── */
-  .zoom-hint {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 12px;
-    color: var(--text-muted);
-    z-index: 800;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-
-  .zoom-hint.visible { opacity: 1; }
-
-  /* ── Responsive ─────────────────────────── */
-  @media (max-width: 768px) {
-    .app {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
-    }
-    .sidebar {
-      max-height: 45vh;
-      border-right: none;
-      border-bottom: 1px solid var(--border);
-    }
-  }
-
-  /* ── Leaflet control overrides ──────────── */
-  .leaflet-control-zoom a {
-    background: var(--surface) !important;
-    color: var(--text) !important;
-    border-color: var(--border) !important;
-  }
-  .leaflet-control-zoom a:hover {
-    background: var(--surface-raised) !important;
-  }
-  .leaflet-control-attribution {
-    background: rgba(12,17,23,0.8) !important;
-    color: var(--text-muted) !important;
-    font-size: 10px !important;
-  }
-  .leaflet-control-attribution a { color: var(--accent) !important; }
 </style>
 </head>
 <body>
 <div class="app">
-
-  <!-- ── Sidebar ──────────────────────────── -->
   <aside class="sidebar">
     <div class="sidebar-header">
       <h1><span class="dot"></span> USGS Streamflow Viewer</h1>
-      <p>Real-time stream discharge from USGS monitoring locations via the OGC API. Color-coded by flow magnitude (cfs).</p>
+      <p>Real-time &amp; historical discharge data. Pin stations to compare hydrographs.</p>
     </div>
 
     <div class="section">
       <div class="section-title">Query</div>
       <div class="control-row">
         <label>State</label>
-        <select id="stateSelect">
-          <option value="">— Pan map or pick —</option>
-        </select>
+        <select id="stateSelect"><option value="">— Pan or pick —</option></select>
       </div>
       <div class="control-row">
         <label>Limit</label>
@@ -382,397 +151,353 @@
           <option value="10000">10,000</option>
         </select>
       </div>
-      <div style="display:flex;gap:8px;margin-top:4px;">
-        <button class="btn btn-primary" id="btnFetch" onclick="fetchData()">Load Streamflow Data</button>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-primary" id="btnFetch" onclick="fetchData()">Load Streamflow</button>
       </div>
       <div style="margin-top:8px">
-        <button class="btn" id="btnBbox" onclick="fetchByBbox()">Load by Current Map Extent</button>
+        <button class="btn" id="btnBbox" onclick="fetchByBbox()">Load by Map Extent</button>
       </div>
     </div>
 
     <div class="section">
-      <div class="section-title">Legend — Discharge (cfs)</div>
+      <div class="section-title">Layers</div>
+      <div class="toggle-row">
+        <span>NHD Stream Lines</span>
+        <label class="toggle"><input type="checkbox" id="toggleNHD"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Discharge (cfs)</div>
       <div class="legend-items">
-        <div class="legend-item">
-          <span class="legend-swatch" style="background:var(--very-low)"></span>
-          <span class="legend-label">Very Low</span>
-          <span class="legend-value">&lt; 10</span>
-        </div>
-        <div class="legend-item">
-          <span class="legend-swatch" style="background:var(--low)"></span>
-          <span class="legend-label">Low</span>
-          <span class="legend-value">10 – 100</span>
-        </div>
-        <div class="legend-item">
-          <span class="legend-swatch" style="background:var(--moderate)"></span>
-          <span class="legend-label">Moderate</span>
-          <span class="legend-value">100 – 1,000</span>
-        </div>
-        <div class="legend-item">
-          <span class="legend-swatch" style="background:var(--high)"></span>
-          <span class="legend-label">High</span>
-          <span class="legend-value">1k – 10k</span>
-        </div>
-        <div class="legend-item">
-          <span class="legend-swatch" style="background:var(--very-high)"></span>
-          <span class="legend-label">Very High</span>
-          <span class="legend-value">10k – 100k</span>
-        </div>
-        <div class="legend-item">
-          <span class="legend-swatch" style="background:var(--extreme)"></span>
-          <span class="legend-label">Extreme</span>
-          <span class="legend-value">&gt; 100k</span>
-        </div>
+        <div class="legend-item"><span class="legend-swatch" style="background:var(--flow-1)"></span><span class="legend-label">Very Low</span><span class="legend-value">&lt; 10</span></div>
+        <div class="legend-item"><span class="legend-swatch" style="background:var(--flow-2)"></span><span class="legend-label">Low</span><span class="legend-value">10 – 100</span></div>
+        <div class="legend-item"><span class="legend-swatch" style="background:var(--flow-3)"></span><span class="legend-label">Moderate</span><span class="legend-value">100 – 1k</span></div>
+        <div class="legend-item"><span class="legend-swatch" style="background:var(--flow-4)"></span><span class="legend-label">High</span><span class="legend-value">1k – 10k</span></div>
+        <div class="legend-item"><span class="legend-swatch" style="background:var(--flow-5)"></span><span class="legend-label">Very High</span><span class="legend-value">10k – 100k</span></div>
+        <div class="legend-item"><span class="legend-swatch" style="background:var(--flow-6)"></span><span class="legend-label">Extreme</span><span class="legend-value">&gt; 100k</span></div>
       </div>
     </div>
 
     <div class="section">
       <div class="section-title">Summary</div>
       <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value" id="statCount">—</div>
-          <div class="stat-label">Stations</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="statMedian">—</div>
-          <div class="stat-label">Median cfs</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="statMax">—</div>
-          <div class="stat-label">Max cfs</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="statMin">—</div>
-          <div class="stat-label">Min cfs</div>
-        </div>
+        <div class="stat-card"><div class="stat-value" id="statCount">—</div><div class="stat-label">Stations</div></div>
+        <div class="stat-card"><div class="stat-value" id="statMedian">—</div><div class="stat-label">Median cfs</div></div>
+        <div class="stat-card"><div class="stat-value" id="statMax">—</div><div class="stat-label">Max cfs</div></div>
+        <div class="stat-card"><div class="stat-value" id="statMin">—</div><div class="stat-label">Min cfs</div></div>
       </div>
     </div>
 
-    <div class="section" style="font-size:12px; color:var(--text-muted); line-height:1.6">
+    <div class="section">
+      <div class="section-title">Comparison <span style="font-weight:400;text-transform:none;letter-spacing:0">(click markers to pin)</span></div>
+      <div class="control-row">
+        <label>Days</label>
+        <select id="historyDays">
+          <option value="1">1</option>
+          <option value="3">3</option>
+          <option value="7" selected>7</option>
+          <option value="14">14</option>
+          <option value="30">30</option>
+        </select>
+      </div>
+      <div class="pinned-list" id="pinnedList">
+        <div style="font-size:12px;color:var(--text-muted);padding:4px 0;">No stations pinned yet</div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px">
+        <button class="btn btn-primary btn-sm" style="flex:1" onclick="fetchHistorical()">Compare Pinned</button>
+        <button class="btn btn-sm" style="flex:1" onclick="clearPinned()">Clear All</button>
+      </div>
+    </div>
+
+    <div class="section" style="font-size:12px;color:var(--text-muted);line-height:1.6">
       <div class="section-title">About</div>
-      Data sourced from the <a href="https://api.waterdata.usgs.gov/ogcapi/v0/" target="_blank" style="color:var(--accent)">USGS Water Data OGC API</a> — <code style="font-family:var(--mono);font-size:11px">latest-continuous</code> collection, parameter code <code style="font-family:var(--mono);font-size:11px">00060</code> (Discharge, cfs). Values may be provisional.
+      USGS <a href="https://api.waterdata.usgs.gov/ogcapi/v0/" target="_blank" style="color:var(--accent)">OGC API</a>
+      — <code style="font-family:var(--mono);font-size:11px">latest-continuous</code> + <code style="font-family:var(--mono);font-size:11px">continuous</code>.
+      Parameter <code style="font-family:var(--mono);font-size:11px">00060</code> (Discharge).
+      Streams from <a href="https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer" target="_blank" style="color:var(--accent)">NHD</a>.
     </div>
 
     <div class="status-bar" id="statusBar">
       <div class="spinner"></div>
-      <span id="statusText">Ready — pick a state or use map extent</span>
+      <span id="statusText">Ready</span>
     </div>
   </aside>
 
-  <!-- ── Map ──────────────────────────────── -->
   <div class="map-wrap">
     <div id="map"></div>
-    <div class="zoom-hint" id="zoomHint">Zoom in for more detail, then click "Load by Current Map Extent"</div>
+    <div class="chart-drawer" id="chartDrawer">
+      <div class="chart-header">
+        <h3 id="chartTitle">Hydrograph Comparison</h3>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn btn-sm" onclick="toggleChart()" style="width:auto;padding:4px 10px">Close</button>
+        </div>
+      </div>
+      <div class="chart-body">
+        <canvas id="hydrograph"></canvas>
+        <div class="chart-placeholder" id="chartPlaceholder">Pin stations and click "Compare Pinned"</div>
+      </div>
+    </div>
   </div>
-
 </div>
 
 <script>
 // ═══════════════════════════════════════════
-// CONFIG
-// ═══════════════════════════════════════════
 const API_BASE = 'https://api.waterdata.usgs.gov/ogcapi/v0';
-const API_KEY = 'nAAeM3paYq4BNN1vLPeVF5WdPOC7oNXnkUj1tbKJ';  // ← Paste your USGS API key here (get one at https://api.waterdata.usgs.gov/signup/)
-const PARAM_DISCHARGE = '00060'; // Discharge, cfs
+const API_KEY = '';  // ← Your key from https://api.waterdata.usgs.gov/signup/
+const PARAM_DISCHARGE = '00060';
 
-// Logarithmic flow classification (cfs)
 const FLOW_CLASSES = [
-  { min: 0,      max: 10,     color: '#d73a49', label: 'Very Low' },
-  { min: 10,     max: 100,    color: '#e3943a', label: 'Low' },
-  { min: 100,    max: 1000,   color: '#3fb950', label: 'Moderate' },
-  { min: 1000,   max: 10000,  color: '#58a6ff', label: 'High' },
-  { min: 10000,  max: 100000, color: '#bc8cff', label: 'Very High' },
-  { min: 100000, max: Infinity,color:'#f778ba', label: 'Extreme' },
+  {min:0,max:10,color:'#ff2d55',label:'Very Low'},
+  {min:10,max:100,color:'#ff6f3c',label:'Low'},
+  {min:100,max:1000,color:'#e8b84b',label:'Moderate'},
+  {min:1000,max:10000,color:'#32d9cb',label:'High'},
+  {min:10000,max:100000,color:'#bf5af2',label:'Very High'},
+  {min:100000,max:Infinity,color:'#ff2d7b',label:'Extreme'},
 ];
 
-// US States with bbox for quick zoom (CONUS + AK/HI)
-const STATES = {
-  'AL': { name: 'Alabama', bbox: [-88.47,30.22,-84.89,35.01] },
-  'AK': { name: 'Alaska', bbox: [-179.15,51.21,-129.97,71.39] },
-  'AZ': { name: 'Arizona', bbox: [-114.81,31.33,-109.04,37.00] },
-  'AR': { name: 'Arkansas', bbox: [-94.62,33.00,-89.64,36.50] },
-  'CA': { name: 'California', bbox: [-124.41,32.53,-114.13,42.01] },
-  'CO': { name: 'Colorado', bbox: [-109.06,36.99,-102.04,41.00] },
-  'CT': { name: 'Connecticut', bbox: [-73.73,40.98,-71.79,42.05] },
-  'DE': { name: 'Delaware', bbox: [-75.79,38.45,-75.05,39.84] },
-  'FL': { name: 'Florida', bbox: [-87.63,24.52,-80.03,31.00] },
-  'GA': { name: 'Georgia', bbox: [-85.61,30.36,-80.84,35.00] },
-  'HI': { name: 'Hawaii', bbox: [-160.24,18.91,-154.81,22.24] },
-  'ID': { name: 'Idaho', bbox: [-117.24,41.99,-111.04,49.00] },
-  'IL': { name: 'Illinois', bbox: [-91.51,36.97,-87.50,42.51] },
-  'IN': { name: 'Indiana', bbox: [-88.10,37.77,-84.78,41.76] },
-  'IA': { name: 'Iowa', bbox: [-96.64,40.38,-90.14,43.50] },
-  'KS': { name: 'Kansas', bbox: [-102.05,36.99,-94.59,40.00] },
-  'KY': { name: 'Kentucky', bbox: [-89.57,36.50,-81.96,39.15] },
-  'LA': { name: 'Louisiana', bbox: [-94.04,28.93,-88.82,33.02] },
-  'ME': { name: 'Maine', bbox: [-71.08,43.06,-66.95,47.46] },
-  'MD': { name: 'Maryland', bbox: [-79.49,37.91,-75.05,39.72] },
-  'MA': { name: 'Massachusetts', bbox: [-73.51,41.24,-69.93,42.89] },
-  'MI': { name: 'Michigan', bbox: [-90.42,41.70,-82.12,48.31] },
-  'MN': { name: 'Minnesota', bbox: [-97.24,43.50,-89.49,49.38] },
-  'MS': { name: 'Mississippi', bbox: [-91.66,30.17,-88.10,34.99] },
-  'MO': { name: 'Missouri', bbox: [-95.77,36.00,-89.10,40.61] },
-  'MT': { name: 'Montana', bbox: [-116.05,44.36,-104.04,49.00] },
-  'NE': { name: 'Nebraska', bbox: [-104.05,40.00,-95.31,43.00] },
-  'NV': { name: 'Nevada', bbox: [-120.00,35.00,-114.04,42.00] },
-  'NH': { name: 'New Hampshire', bbox: [-72.56,42.70,-70.70,45.31] },
-  'NJ': { name: 'New Jersey', bbox: [-75.56,38.93,-73.89,41.36] },
-  'NM': { name: 'New Mexico', bbox: [-109.05,31.33,-103.00,37.00] },
-  'NY': { name: 'New York', bbox: [-79.76,40.50,-71.86,45.02] },
-  'NC': { name: 'North Carolina', bbox: [-84.32,33.84,-75.46,36.59] },
-  'ND': { name: 'North Dakota', bbox: [-104.05,45.94,-96.55,49.00] },
-  'OH': { name: 'Ohio', bbox: [-84.82,38.40,-80.52,42.33] },
-  'OK': { name: 'Oklahoma', bbox: [-103.00,33.62,-94.43,37.00] },
-  'OR': { name: 'Oregon', bbox: [-124.57,41.99,-116.46,46.29] },
-  'PA': { name: 'Pennsylvania', bbox: [-80.52,39.72,-74.69,42.27] },
-  'RI': { name: 'Rhode Island', bbox: [-71.86,41.15,-71.12,42.02] },
-  'SC': { name: 'South Carolina', bbox: [-83.35,32.05,-78.54,35.21] },
-  'SD': { name: 'South Dakota', bbox: [-104.06,42.48,-96.44,45.94] },
-  'TN': { name: 'Tennessee', bbox: [-90.31,34.98,-81.65,36.68] },
-  'TX': { name: 'Texas', bbox: [-106.65,25.84,-93.51,36.50] },
-  'UT': { name: 'Utah', bbox: [-114.05,37.00,-109.04,42.00] },
-  'VT': { name: 'Vermont', bbox: [-73.44,42.73,-71.46,45.02] },
-  'VA': { name: 'Virginia', bbox: [-83.68,36.54,-75.24,39.47] },
-  'WA': { name: 'Washington', bbox: [-124.73,45.54,-116.92,49.00] },
-  'WV': { name: 'West Virginia', bbox: [-82.64,37.20,-77.72,40.64] },
-  'WI': { name: 'Wisconsin', bbox: [-92.89,42.49,-86.25,47.08] },
-  'WY': { name: 'Wyoming', bbox: [-111.06,40.99,-104.05,45.01] },
-};
+const CHART_COLORS = ['#bf5af2','#32d9cb','#ff2d7b','#e8b84b','#4d9dff','#ff6f3c','#ff2d55','#7a3aaf','#50e3a4','#f5a3c7'];
+
+const STATES = {'AL':{name:'Alabama',bbox:[-88.47,30.22,-84.89,35.01]},'AK':{name:'Alaska',bbox:[-179.15,51.21,-129.97,71.39]},'AZ':{name:'Arizona',bbox:[-114.81,31.33,-109.04,37]},'AR':{name:'Arkansas',bbox:[-94.62,33,-89.64,36.5]},'CA':{name:'California',bbox:[-124.41,32.53,-114.13,42.01]},'CO':{name:'Colorado',bbox:[-109.06,36.99,-102.04,41]},'CT':{name:'Connecticut',bbox:[-73.73,40.98,-71.79,42.05]},'DE':{name:'Delaware',bbox:[-75.79,38.45,-75.05,39.84]},'FL':{name:'Florida',bbox:[-87.63,24.52,-80.03,31]},'GA':{name:'Georgia',bbox:[-85.61,30.36,-80.84,35]},'HI':{name:'Hawaii',bbox:[-160.24,18.91,-154.81,22.24]},'ID':{name:'Idaho',bbox:[-117.24,41.99,-111.04,49]},'IL':{name:'Illinois',bbox:[-91.51,36.97,-87.5,42.51]},'IN':{name:'Indiana',bbox:[-88.1,37.77,-84.78,41.76]},'IA':{name:'Iowa',bbox:[-96.64,40.38,-90.14,43.5]},'KS':{name:'Kansas',bbox:[-102.05,36.99,-94.59,40]},'KY':{name:'Kentucky',bbox:[-89.57,36.5,-81.96,39.15]},'LA':{name:'Louisiana',bbox:[-94.04,28.93,-88.82,33.02]},'ME':{name:'Maine',bbox:[-71.08,43.06,-66.95,47.46]},'MD':{name:'Maryland',bbox:[-79.49,37.91,-75.05,39.72]},'MA':{name:'Massachusetts',bbox:[-73.51,41.24,-69.93,42.89]},'MI':{name:'Michigan',bbox:[-90.42,41.7,-82.12,48.31]},'MN':{name:'Minnesota',bbox:[-97.24,43.5,-89.49,49.38]},'MS':{name:'Mississippi',bbox:[-91.66,30.17,-88.1,34.99]},'MO':{name:'Missouri',bbox:[-95.77,36,-89.1,40.61]},'MT':{name:'Montana',bbox:[-116.05,44.36,-104.04,49]},'NE':{name:'Nebraska',bbox:[-104.05,40,-95.31,43]},'NV':{name:'Nevada',bbox:[-120,35,-114.04,42]},'NH':{name:'New Hampshire',bbox:[-72.56,42.7,-70.7,45.31]},'NJ':{name:'New Jersey',bbox:[-75.56,38.93,-73.89,41.36]},'NM':{name:'New Mexico',bbox:[-109.05,31.33,-103,37]},'NY':{name:'New York',bbox:[-79.76,40.5,-71.86,45.02]},'NC':{name:'North Carolina',bbox:[-84.32,33.84,-75.46,36.59]},'ND':{name:'North Dakota',bbox:[-104.05,45.94,-96.55,49]},'OH':{name:'Ohio',bbox:[-84.82,38.4,-80.52,42.33]},'OK':{name:'Oklahoma',bbox:[-103,33.62,-94.43,37]},'OR':{name:'Oregon',bbox:[-124.57,41.99,-116.46,46.29]},'PA':{name:'Pennsylvania',bbox:[-80.52,39.72,-74.69,42.27]},'RI':{name:'Rhode Island',bbox:[-71.86,41.15,-71.12,42.02]},'SC':{name:'South Carolina',bbox:[-83.35,32.05,-78.54,35.21]},'SD':{name:'South Dakota',bbox:[-104.06,42.48,-96.44,45.94]},'TN':{name:'Tennessee',bbox:[-90.31,34.98,-81.65,36.68]},'TX':{name:'Texas',bbox:[-106.65,25.84,-93.51,36.5]},'UT':{name:'Utah',bbox:[-114.05,37,-109.04,42]},'VT':{name:'Vermont',bbox:[-73.44,42.73,-71.46,45.02]},'VA':{name:'Virginia',bbox:[-83.68,36.54,-75.24,39.47]},'WA':{name:'Washington',bbox:[-124.73,45.54,-116.92,49]},'WV':{name:'West Virginia',bbox:[-82.64,37.2,-77.72,40.64]},'WI':{name:'Wisconsin',bbox:[-92.89,42.49,-86.25,47.08]},'WY':{name:'Wyoming',bbox:[-111.06,40.99,-104.05,45.01]}};
 
 // ═══════════════════════════════════════════
-// MAP INIT
+// MAP
 // ═══════════════════════════════════════════
-const map = L.map('map', {
-  center: [39.5, -98.5],
-  zoom: 5,
-  zoomControl: true,
-  attributionControl: true,
-});
-
-// Dark basemap tiles
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a> | Data: <a href="https://waterdata.usgs.gov">USGS NWIS</a>',
-  maxZoom: 19,
+const map = L.map('map',{center:[39.5,-98.5],zoom:5});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a> | <a href="https://waterdata.usgs.gov">USGS</a>',
+  maxZoom:19
 }).addTo(map);
 
 let markersLayer = L.layerGroup().addTo(map);
 let currentData = [];
 
-// ═══════════════════════════════════════════
-// STATE DROPDOWN
-// ═══════════════════════════════════════════
-const stateSelect = document.getElementById('stateSelect');
-Object.entries(STATES)
-  .sort((a, b) => a[1].name.localeCompare(b[1].name))
-  .forEach(([code, s]) => {
-    const opt = document.createElement('option');
-    opt.value = code;
-    opt.textContent = `${s.name} (${code})`;
-    stateSelect.appendChild(opt);
-  });
+// NHD WMS
+const nhdLayer = L.tileLayer.wms('https://hydro.nationalmap.gov/arcgis/services/nhd/MapServer/WMSServer',{
+  layers:'6',
+  format:'image/png',
+  transparent:true,
+  opacity:0.45,
+  maxZoom:19,
+  attribution:'NHD © USGS'
+});
+document.getElementById('toggleNHD').addEventListener('change', e => {
+  e.target.checked ? nhdLayer.addTo(map) : map.removeLayer(nhdLayer);
+});
 
-stateSelect.addEventListener('change', () => {
-  const code = stateSelect.value;
-  if (!code) return;
-  const bb = STATES[code].bbox;
-  map.fitBounds([[bb[1], bb[0]], [bb[3], bb[2]]], { padding: [20, 20] });
+// State dropdown
+const stateSelect = document.getElementById('stateSelect');
+Object.entries(STATES).sort((a,b)=>a[1].name.localeCompare(b[1].name)).forEach(([code,s])=>{
+  const o=document.createElement('option');o.value=code;o.textContent=`${s.name} (${code})`;stateSelect.appendChild(o);
+});
+stateSelect.addEventListener('change',()=>{
+  const c=stateSelect.value;if(!c)return;
+  const bb=STATES[c].bbox;
+  map.fitBounds([[bb[1],bb[0]],[bb[3],bb[2]]],{padding:[20,20]});
 });
 
 // ═══════════════════════════════════════════
-// DATA FETCHING
+// HELPERS
 // ═══════════════════════════════════════════
-function setStatus(msg, loading = false) {
-  const bar = document.getElementById('statusBar');
-  document.getElementById('statusText').textContent = msg;
-  bar.classList.toggle('loading', loading);
+function setStatus(msg,loading=false){document.getElementById('statusText').textContent=msg;document.getElementById('statusBar').classList.toggle('loading',loading)}
+function getLimit(){return parseInt(document.getElementById('limitSelect').value)}
+function apiParam(){return API_KEY?`&api_key=${API_KEY}`:''}
+function classifyFlow(v){for(const c of FLOW_CLASSES)if(v>=c.min&&v<c.max)return c;return FLOW_CLASSES[5]}
+function radiusForFlow(v){return v<=0?4:4+Math.min(10,Math.log10(v+1)*2.5)}
+function formatNum(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'k';return n.toFixed(1)}
+
+// ═══════════════════════════════════════════
+// LATEST DATA
+// ═══════════════════════════════════════════
+async function fetchData(){
+  const c=stateSelect.value;
+  if(!c)return fetchByBbox();
+  await doFetch(`bbox=${STATES[c].bbox.join(',')}`);
 }
 
-function getLimit() {
-  return parseInt(document.getElementById('limitSelect').value);
+async function fetchByBbox(){
+  const b=map.getBounds();
+  await doFetch(`bbox=${[b.getWest().toFixed(4),b.getSouth().toFixed(4),b.getEast().toFixed(4),b.getNorth().toFixed(4)].join(',')}`);
 }
 
-async function fetchData() {
-  const code = stateSelect.value;
-  if (!code) {
-    // fallback to bbox
-    return fetchByBbox();
-  }
-  const bb = STATES[code].bbox;
-  const bboxStr = bb.join(',');
-  await doFetch(`bbox=${bboxStr}`);
-}
-
-async function fetchByBbox() {
-  const b = map.getBounds();
-  const bboxStr = [
-    b.getWest().toFixed(4),
-    b.getSouth().toFixed(4),
-    b.getEast().toFixed(4),
-    b.getNorth().toFixed(4)
-  ].join(',');
-  await doFetch(`bbox=${bboxStr}`);
-}
-
-async function doFetch(spatialFilter) {
-  const limit = getLimit();
-  const apiKeyParam = API_KEY ? `&api_key=${API_KEY}` : '';
-  const url = `${API_BASE}/collections/latest-continuous/items?f=json&parameter_code=${PARAM_DISCHARGE}&${spatialFilter}&limit=${limit}&properties=monitoring_location_id,value,unit_of_measure,time,approval_status,qualifier${apiKeyParam}`;
-
-  setStatus('Querying USGS OGC API…', true);
-  document.getElementById('btnFetch').disabled = true;
-  document.getElementById('btnBbox').disabled = true;
-
-  try {
-    let allFeatures = [];
-    let fetchUrl = url;
-    let page = 1;
-
-    while (fetchUrl) {
-      setStatus(`Fetching page ${page}…`, true);
-      const resp = await fetch(fetchUrl);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
-      const data = await resp.json();
-
-      if (data.features) {
-        allFeatures = allFeatures.concat(data.features);
-      }
-
-      // Check for pagination (next link)
-      const nextLink = (data.links || []).find(l => l.rel === 'next');
-      // Only follow pagination if we haven't hit our desired limit
-      if (nextLink && allFeatures.length < limit) {
-        fetchUrl = nextLink.href;
-        page++;
-      } else {
-        fetchUrl = null;
-      }
+async function doFetch(spatialFilter){
+  const limit=getLimit();
+  const url=`${API_BASE}/collections/latest-continuous/items?f=json&parameter_code=${PARAM_DISCHARGE}&${spatialFilter}&limit=${limit}&properties=monitoring_location_id,value,unit_of_measure,time,approval_status,qualifier${apiParam()}`;
+  setStatus('Querying USGS…',true);
+  document.getElementById('btnFetch').disabled=true;
+  document.getElementById('btnBbox').disabled=true;
+  try{
+    let all=[];let fUrl=url;let pg=1;
+    while(fUrl){
+      setStatus(`Page ${pg}…`,true);
+      const r=await fetch(fUrl);if(!r.ok)throw new Error(`HTTP ${r.status}`);
+      const d=await r.json();if(d.features)all=all.concat(d.features);
+      const nx=(d.links||[]).find(l=>l.rel==='next');
+      fUrl=(nx&&all.length<limit)?nx.href:null;pg++;
     }
-
-    currentData = allFeatures;
-    renderMarkers(allFeatures);
-    updateStats(allFeatures);
-    setStatus(`Loaded ${allFeatures.length.toLocaleString()} stations`);
-  } catch (err) {
-    console.error(err);
-    setStatus(`Error: ${err.message}`);
-  } finally {
-    document.getElementById('btnFetch').disabled = false;
-    document.getElementById('btnBbox').disabled = false;
-  }
+    currentData=all;
+    renderMarkers(all);
+    updateStats(all);
+    setStatus(`Loaded ${all.length.toLocaleString()} stations`);
+  }catch(e){console.error(e);setStatus(`Error: ${e.message}`)}
+  finally{document.getElementById('btnFetch').disabled=false;document.getElementById('btnBbox').disabled=false}
 }
 
 // ═══════════════════════════════════════════
-// RENDERING
+// RENDER MARKERS
 // ═══════════════════════════════════════════
-function classifyFlow(val) {
-  for (const cls of FLOW_CLASSES) {
-    if (val >= cls.min && val < cls.max) return cls;
-  }
-  return FLOW_CLASSES[FLOW_CLASSES.length - 1];
-}
-
-function radiusForFlow(val) {
-  // Log-scaled radius: 4–14px
-  if (val <= 0) return 4;
-  const r = 4 + Math.min(10, Math.log10(val + 1) * 2.5);
-  return r;
-}
-
-function formatNum(n) {
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
-  return n.toFixed(1);
-}
-
-function renderMarkers(features) {
+function renderMarkers(features){
   markersLayer.clearLayers();
-
-  features.forEach(f => {
-    if (!f.geometry || !f.geometry.coordinates) return;
-    const [lng, lat] = f.geometry.coordinates;
-    const props = f.properties || {};
-    const rawVal = parseFloat(props.value);
-    const val = isNaN(rawVal) ? null : rawVal;
-
-    if (val === null) return;
-
-    const cls = classifyFlow(val);
-    const r = radiusForFlow(val);
-
-    const marker = L.circleMarker([lat, lng], {
-      radius: r,
-      fillColor: cls.color,
-      fillOpacity: 0.85,
-      color: '#fff',
-      weight: 0.6,
-      opacity: 0.5,
+  features.forEach(f=>{
+    if(!f.geometry?.coordinates)return;
+    const[lng,lat]=f.geometry.coordinates;
+    const p=f.properties||{};
+    const v=parseFloat(p.value);if(isNaN(v))return;
+    const cls=classifyFlow(v);
+    const marker=L.circleMarker([lat,lng],{
+      radius:radiusForFlow(v),fillColor:cls.color,fillOpacity:.85,color:cls.color,weight:1,opacity:.4
     });
-
-    // Popup
-    const locId = props.monitoring_location_id || '—';
-    const siteNum = locId.replace('USGS-', '');
-    const timeStr = props.time ? new Date(props.time).toLocaleString() : '—';
-    const unit = props.unit_of_measure || 'cfs';
-    const status = props.approval_status || '—';
-    const qual = props.qualifier || '—';
-
-    const bgColor = cls.color + '22';
-
+    const locId=p.monitoring_location_id||'—';
+    const sn=locId.replace('USGS-','');
+    const ts=p.time?new Date(p.time).toLocaleString():'—';
+    const u=p.unit_of_measure||'cfs';
+    const st=p.approval_status||'—';
+    const q=p.qualifier;
+    const bg=cls.color+'18';
     marker.bindPopup(`
       <div class="popup-title">${locId}</div>
-      <div class="popup-flow" style="background:${bgColor};color:${cls.color}">
-        ${formatNum(val)} <span style="font-size:11px;opacity:0.7">${unit}</span>
-      </div>
+      <div class="popup-flow" style="background:${bg};color:${cls.color}">${formatNum(v)} <span style="font-size:11px;opacity:.7">${u}</span></div>
       <div style="margin-top:8px">
         <div class="popup-row"><span class="k">Class</span><span class="v" style="color:${cls.color}">${cls.label}</span></div>
-        <div class="popup-row"><span class="k">Time</span><span class="v">${timeStr}</span></div>
-        <div class="popup-row"><span class="k">Status</span><span class="v">${status}</span></div>
-        ${qual !== '—' && qual !== null ? `<div class="popup-row"><span class="k">Qualifier</span><span class="v">${qual}</span></div>` : ''}
-        <div class="popup-row" style="margin-top:6px">
-          <a href="https://waterdata.usgs.gov/monitoring-location/${siteNum}/" target="_blank" style="color:var(--accent);font-size:11px;text-decoration:none">
-            View on USGS ↗
-          </a>
-        </div>
+        <div class="popup-row"><span class="k">Time</span><span class="v">${ts}</span></div>
+        <div class="popup-row"><span class="k">Status</span><span class="v">${st}</span></div>
+        ${q?`<div class="popup-row"><span class="k">Qualifier</span><span class="v">${q}</span></div>`:''}
       </div>
-    `, { maxWidth: 260 });
-
+      <div class="popup-actions">
+        <button class="popup-btn popup-btn-accent" onclick="pinStation('${locId}')">${pinnedStations.has(locId)?'✓ Pinned':'+ Pin to Compare'}</button>
+        <a class="popup-btn" href="https://waterdata.usgs.gov/monitoring-location/${sn}/" target="_blank">USGS ↗</a>
+      </div>
+    `,{maxWidth:260});
     markersLayer.addLayer(marker);
   });
 }
 
-function updateStats(features) {
-  const vals = features
-    .map(f => parseFloat(f.properties?.value))
-    .filter(v => !isNaN(v))
-    .sort((a, b) => a - b);
-
-  const count = vals.length;
-  document.getElementById('statCount').textContent = count.toLocaleString();
-
-  if (count === 0) {
-    document.getElementById('statMedian').textContent = '—';
-    document.getElementById('statMax').textContent = '—';
-    document.getElementById('statMin').textContent = '—';
-    return;
-  }
-
-  const median = count % 2 === 0
-    ? (vals[count / 2 - 1] + vals[count / 2]) / 2
-    : vals[Math.floor(count / 2)];
-
-  document.getElementById('statMedian').textContent = formatNum(median);
-  document.getElementById('statMax').textContent = formatNum(vals[count - 1]);
-  document.getElementById('statMin').textContent = formatNum(vals[0]);
+function updateStats(features){
+  const vals=features.map(f=>parseFloat(f.properties?.value)).filter(v=>!isNaN(v)).sort((a,b)=>a-b);
+  const n=vals.length;
+  document.getElementById('statCount').textContent=n.toLocaleString();
+  if(!n){['statMedian','statMax','statMin'].forEach(id=>document.getElementById(id).textContent='—');return}
+  const med=n%2===0?(vals[n/2-1]+vals[n/2])/2:vals[Math.floor(n/2)];
+  document.getElementById('statMedian').textContent=formatNum(med);
+  document.getElementById('statMax').textContent=formatNum(vals[n-1]);
+  document.getElementById('statMin').textContent=formatNum(vals[0]);
 }
 
 // ═══════════════════════════════════════════
-// ZOOM HINT
+// PINNED STATIONS
 // ═══════════════════════════════════════════
-const zoomHint = document.getElementById('zoomHint');
-map.on('zoomend', () => {
-  zoomHint.classList.toggle('visible', map.getZoom() < 6);
-});
-zoomHint.classList.toggle('visible', map.getZoom() < 6);
+let pinnedStations=new Map();
+let pinnedIdx=0;
+
+function pinStation(locId){
+  if(pinnedStations.has(locId))return;
+  if(pinnedStations.size>=10){alert('Max 10 stations');return}
+  pinnedStations.set(locId,{color:CHART_COLORS[pinnedIdx%CHART_COLORS.length],index:pinnedIdx});
+  pinnedIdx++;
+  map.closePopup();
+  renderPinnedList();
+}
+
+function unpinStation(locId){pinnedStations.delete(locId);renderPinnedList()}
+
+function clearPinned(){pinnedStations.clear();pinnedIdx=0;renderPinnedList();clearChart()}
+
+function renderPinnedList(){
+  const el=document.getElementById('pinnedList');
+  if(!pinnedStations.size){el.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:4px 0;">No stations pinned yet</div>';return}
+  el.innerHTML='';
+  pinnedStations.forEach((info,locId)=>{
+    const d=document.createElement('div');d.className='pinned-item';
+    d.innerHTML=`<span class="pinned-color" style="background:${info.color};box-shadow:0 0 6px ${info.color}40"></span><span class="pinned-name">${locId}</span><button class="pinned-remove" onclick="unpinStation('${locId}')">&times;</button>`;
+    el.appendChild(d);
+  });
+}
+
+// ═══════════════════════════════════════════
+// HISTORICAL + CHART
+// ═══════════════════════════════════════════
+let hydrographChart=null;
+
+function toggleChart(){
+  document.getElementById('chartDrawer').classList.toggle('open');
+  if(hydrographChart)setTimeout(()=>hydrographChart.resize(),350);
+}
+
+function clearChart(){
+  if(hydrographChart){hydrographChart.destroy();hydrographChart=null}
+  document.getElementById('chartPlaceholder').style.display='flex';
+  document.getElementById('chartPlaceholder').textContent='Pin stations and click "Compare Pinned"';
+  document.getElementById('chartDrawer').classList.remove('open');
+}
+
+async function fetchHistorical(){
+  if(!pinnedStations.size){alert('Pin at least one station first.');return}
+  const days=parseInt(document.getElementById('historyDays').value);
+  const now=new Date();
+  const start=new Date(now.getTime()-days*864e5);
+  const dt=`${start.toISOString()}/${now.toISOString()}`;
+
+  document.getElementById('chartDrawer').classList.add('open');
+  const ph=document.getElementById('chartPlaceholder');
+  ph.style.display='flex';ph.textContent='Fetching historical data…';
+
+  const datasets=[];
+  for(const[locId,info] of pinnedStations){
+    setStatus(`History: ${locId}…`,true);
+    try{
+      let feats=[];
+      let url=`${API_BASE}/collections/continuous/items?f=json&monitoring_location_id=${locId}&parameter_code=${PARAM_DISCHARGE}&datetime=${dt}&limit=10000&properties=value,time&sortby=time${apiParam()}`;
+      while(url){
+        const r=await fetch(url);if(!r.ok)throw new Error(`HTTP ${r.status}`);
+        const d=await r.json();if(d.features)feats=feats.concat(d.features);
+        const nx=(d.links||[]).find(l=>l.rel==='next');url=nx?nx.href:null;
+      }
+      const pts=feats.map(f=>({x:new Date(f.properties.time),y:parseFloat(f.properties.value)})).filter(p=>!isNaN(p.y)).sort((a,b)=>a.x-b.x);
+      datasets.push({label:locId,data:pts,borderColor:info.color,backgroundColor:info.color+'18',borderWidth:1.5,pointRadius:0,pointHitRadius:6,tension:.2,fill:false});
+    }catch(e){console.error(`${locId}:`,e)}
+  }
+  setStatus(`History loaded for ${datasets.length} station(s)`);
+  renderChart(datasets,days);
+}
+
+function renderChart(datasets,days){
+  const ph=document.getElementById('chartPlaceholder');
+  if(!datasets.length||datasets.every(d=>!d.data.length)){ph.textContent='No data found for selected period.';ph.style.display='flex';return}
+  ph.style.display='none';
+  if(hydrographChart)hydrographChart.destroy();
+
+  hydrographChart=new Chart(document.getElementById('hydrograph').getContext('2d'),{
+    type:'line',
+    data:{datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:600},
+      interaction:{mode:'nearest',axis:'x',intersect:false},
+      plugins:{
+        legend:{display:true,position:'top',labels:{color:'#d8d0e8',font:{family:"'DM Sans',sans-serif",size:11},boxWidth:10,boxHeight:10,useBorderRadius:true,borderRadius:2,padding:12}},
+        tooltip:{
+          backgroundColor:'#100e18ee',titleColor:'#d8d0e8',bodyColor:'#d8d0e8',borderColor:'#2a2440',borderWidth:1,
+          titleFont:{family:"'DM Sans',sans-serif",weight:'600'},bodyFont:{family:"'JetBrains Mono',monospace",size:12},padding:10,
+          callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y.toLocaleString()} cfs`}
+        }
+      },
+      scales:{
+        x:{type:'time',time:{tooltipFormat:'MMM d, yyyy HH:mm',displayFormats:{hour:'MMM d HH:mm',day:'MMM d'}},ticks:{color:'#7a6f96',font:{family:"'DM Sans',sans-serif",size:10},maxTicksLimit:10},grid:{color:'#2a244020'}},
+        y:{title:{display:true,text:'Discharge (cfs)',color:'#7a6f96',font:{family:"'DM Sans',sans-serif",size:11}},ticks:{color:'#7a6f96',font:{family:"'JetBrains Mono',monospace",size:10},callback:v=>v>=1000?(v/1000)+'k':v},grid:{color:'#2a244020'}}
+      }
+    }
+  });
+  document.getElementById('chartTitle').textContent=`Hydrograph — Last ${days} Day${days>1?'s':''}`;
+}
 </script>
 </body>
 </html>
