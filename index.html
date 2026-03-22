@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="robots" content="noindex, nofollow" />
+ <meta name="robots" content="noindex, nofollow" />
 <title>USGS Streamflow Viewer</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -34,6 +34,7 @@
     --flow-4: #20527a;  /* high      */
     --flow-5: #142657;  /* very high */
     --flow-6: #010442;  /* extreme   */
+    --flow-neg: #ef4444; /* negative  */
 
     --radius: 8px;
     --font: 'DM Sans', -apple-system, sans-serif;
@@ -207,6 +208,7 @@
     <div class="section">
       <div class="section-title">Discharge (cfs)</div>
       <div class="legend-items">
+        <div class="legend-item"><span class="legend-swatch" style="background:var(--flow-neg)"></span><span class="legend-label">Negative</span><span class="legend-value">&lt; 0</span></div>
         <div class="legend-item"><span class="legend-swatch" style="background:var(--flow-1)"></span><span class="legend-label">Very Low</span><span class="legend-value">&lt; 10</span></div>
         <div class="legend-item"><span class="legend-swatch" style="background:var(--flow-2)"></span><span class="legend-label">Low</span><span class="legend-value">10 – 100</span></div>
         <div class="legend-item"><span class="legend-swatch" style="background:var(--flow-3)"></span><span class="legend-label">Moderate</span><span class="legend-value">100 – 1k</span></div>
@@ -317,6 +319,7 @@
           <div class="accordion-content">
             <p>Markers are classified into six logarithmic bins based on instantaneous discharge in cubic feet per second (cfs):</p>
             <ul>
+              <li><strong style="color:#ef4444">Negative (&lt; 0 cfs)</strong> — Indicates reverse flow, most commonly seen at tidally influenced stations where incoming tides push water upstream, or at sites affected by backwater conditions, dam operations, or wind-driven flow reversals. Shown in bright red to flag these unusual readings immediately.</li>
               <li><strong style="color:#b5f5db">Very Low (&lt; 10 cfs)</strong> — Typical of small headwater streams, springs, or streams during drought/baseflow conditions. Pale mint, the lightest color in the ramp.</li>
               <li><strong style="color:#70bab1">Low (10–100 cfs)</strong> — Common for small to mid-size streams under normal flow conditions. Muted teal.</li>
               <li><strong style="color:#3b8a94">Moderate (100–1,000 cfs)</strong> — Mid-range rivers or smaller rivers experiencing elevated flow from recent rainfall. Deep teal.</li>
@@ -385,6 +388,7 @@ const API_BASE = 'https://api.waterdata.usgs.gov/ogcapi/v0';
 const API_KEY = 'nAAeM3paYq4BNN1vLPeVF5WdPOC7oNXnkUj1tbKJ';  // ← https://api.waterdata.usgs.gov/signup/
 const PARAM_DISCHARGE = '00060';
 
+const FLOW_NEGATIVE = {min:-Infinity,max:0,color:'#ef4444',label:'Negative'};
 const FLOW_CLASSES = [
   {min:0,max:10,color:'#b5f5db',label:'Very Low'},
   {min:10,max:100,color:'#70bab1',label:'Low'},
@@ -456,9 +460,9 @@ function toggleAccordion(btn) {
 function setStatus(msg,loading=false){document.getElementById('statusText').textContent=msg;document.getElementById('statusBar').classList.toggle('loading',loading)}
 function getLimit(){return parseInt(document.getElementById('limitSelect').value)}
 function apiParam(){return API_KEY?`&api_key=${API_KEY}`:''}
-function classifyFlow(v){for(const c of FLOW_CLASSES)if(v>=c.min&&v<c.max)return c;return FLOW_CLASSES[5]}
+function classifyFlow(v){if(v<0)return FLOW_NEGATIVE;for(const c of FLOW_CLASSES)if(v>=c.min&&v<c.max)return c;return FLOW_CLASSES[5]}
 // Readable text color for popups — dark flow colors are invisible on dark bg
-const FLOW_TEXT = {'#b5f5db':'#b5f5db','#70bab1':'#70bab1','#3b8a94':'#5ab8c4','#20527a':'#5a9ac4','#142657':'#7a9fd4','#010442':'#9a8ae8'};
+const FLOW_TEXT = {'#ef4444':'#ef4444','#b5f5db':'#b5f5db','#70bab1':'#70bab1','#3b8a94':'#5ab8c4','#20527a':'#5a9ac4','#142657':'#7a9fd4','#010442':'#9a8ae8'};
 function flowTextColor(c){return FLOW_TEXT[c]||c}
 function radiusForFlow(v){return v<=0?4:4+Math.min(10,Math.log10(v+1)*2.5)}
 function formatNum(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'k';return n.toFixed(1)}
@@ -509,7 +513,7 @@ function renderMarkers(features){
     const v=parseFloat(p.value);if(isNaN(v))return;
     const cls=classifyFlow(v);
     // Use a light stroke for dark flow classes so they pop on the dark basemap
-    const strokeColor = (v >= 1000) ? '#5a8a8a' : cls.color;
+    const strokeColor = (v < 0) ? '#ef4444' : (v >= 1000) ? '#5a8a8a' : cls.color;
     const marker=L.circleMarker([lat,lng],{
       radius:radiusForFlow(v),fillColor:cls.color,fillOpacity:.85,color:strokeColor,weight:1.5,opacity:.6
     });
