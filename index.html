@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -472,6 +473,7 @@
 // CONFIG
 // ═══════════════════════════════════════════
 const API_BASE = 'https://api.waterdata.usgs.gov/ogcapi/v0';
+const API_KEY = 'nAAeM3paYq4BNN1vLPeVF5WdPOC7oNXnkUj1tbKJ';  // ← Paste your USGS API key here (get one at https://api.waterdata.usgs.gov/signup/)
 const PARAM_DISCHARGE = '00060'; // Discharge, cfs
 
 // Logarithmic flow classification (cfs)
@@ -614,7 +616,8 @@ async function fetchByBbox() {
 
 async function doFetch(spatialFilter) {
   const limit = getLimit();
-  const url = `${API_BASE}/collections/latest-continuous/items?f=json&parameter_code=${PARAM_DISCHARGE}&${spatialFilter}&limit=${limit}&properties=monitoring_location_id,value,unit_of_measure,time,approval_status,qualifier`;
+  const apiKeyParam = API_KEY ? `&api_key=${API_KEY}` : '';
+  const url = `${API_BASE}/collections/latest-continuous/items?f=json&parameter_code=${PARAM_DISCHARGE}&${spatialFilter}&limit=${limit}&properties=monitoring_location_id,value,unit_of_measure,time,approval_status,qualifier${apiKeyParam}`;
 
   setStatus('Querying USGS OGC API…', true);
   document.getElementById('btnFetch').disabled = true;
