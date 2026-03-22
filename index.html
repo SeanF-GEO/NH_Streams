@@ -26,13 +26,13 @@
     --accent-dim:    #0e7490;
     --accent-soft:   #164e63;
 
-    /* Flow classes — hues 130–250, alternating light/dark for contrast */
-    --flow-1: #86efac;  /* h≈142  pale green   (light) */
-    --flow-2: #14b8a6;  /* h≈173  deep teal    (dark)  */
-    --flow-3: #67e8f9;  /* h≈187  light cyan   (light) */
-    --flow-4: #3b82f6;  /* h≈217  blue         (dark)  */
-    --flow-5: #a5b4fc;  /* h≈230  pale indigo  (light) */
-    --flow-6: #7c3aed;  /* h≈258  violet       (dark)  */
+    /* Flow classes — user-defined water ramp */
+    --flow-1: #b5f5db;  /* very low  */
+    --flow-2: #70bab1;  /* low       */
+    --flow-3: #3b8a94;  /* moderate  */
+    --flow-4: #20527a;  /* high      */
+    --flow-5: #142657;  /* very high */
+    --flow-6: #010442;  /* extreme   */
 
     --radius: 8px;
     --font: 'DM Sans', -apple-system, sans-serif;
@@ -97,7 +97,7 @@
   /* ── Legend ─────────────────────────── */
   .legend-items{display:flex;flex-direction:column;gap:6px}
   .legend-item{display:flex;align-items:center;gap:10px;font-size:12px}
-  .legend-swatch{width:14px;height:14px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.06)}
+  .legend-swatch{width:14px;height:14px;border-radius:50%;flex-shrink:0;border:2px solid rgba(200,230,230,.15)}
   .legend-label{color:var(--text-muted)}
   .legend-value{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--text)}
 
@@ -260,7 +260,7 @@
         <div class="accordion-body">
           <div class="accordion-content">
             <p><strong>Loading data:</strong> Select a state from the dropdown and click <strong>Load Streamflow</strong> to fetch the latest discharge readings for all USGS monitoring stations in that state. Alternatively, pan and zoom the map to your area of interest, then click <strong>Load by Map Extent</strong> to query within the current viewport. The <strong>Limit</strong> control caps how many station records are returned per request.</p>
-            <p><strong>Reading the map:</strong> Each circle marker represents a USGS streamgage. The marker color indicates the current discharge magnitude according to the legend — green for very low flows, through cyan and blue for moderate and high flows, up to violet for extremely high discharge. Marker size also scales logarithmically with flow value, so larger circles mean higher flow.</p>
+            <p><strong>Reading the map:</strong> Each circle marker represents a USGS streamgage. The marker color indicates the current discharge magnitude according to the legend — a light-to-dark ramp from pale mint for very low flows through teals and blues, down to deep navy and indigo for the highest flows. Marker size also scales logarithmically with flow value, so larger circles mean higher flow. Darker markers have a lighter outline to remain visible on the dark basemap.</p>
             <p><strong>Station details:</strong> Click any marker to open a popup showing the station ID, current discharge value, measurement timestamp, data approval status, and any data qualifiers. From the popup you can <strong>pin</strong> the station for hydrograph comparison, or jump to the official USGS monitoring location page.</p>
             <p><strong>Comparing stations:</strong> Pin up to 10 stations by clicking the "Pin to Compare" button in each popup. Choose a lookback window (1–30 days) from the <strong>Days</strong> dropdown, then click <strong>Compare Pinned</strong>. The chart drawer will open at the bottom showing overlaid hydrographs for all pinned stations. Hover over the chart to see exact values at any point in time.</p>
             <p><strong>Stream lines:</strong> Toggle the <strong>NHD Stream Lines</strong> layer to overlay the USGS National Hydrography Dataset flowline network on the map. At wide zoom levels you'll see the small-scale nationwide network; as you zoom in, high-resolution flowlines appear with full detail down to headwater streams.</p>
@@ -316,12 +316,12 @@
           <div class="accordion-content">
             <p>Markers are classified into six logarithmic bins based on instantaneous discharge in cubic feet per second (cfs):</p>
             <ul>
-              <li><strong style="color:var(--flow-1)">Very Low (&lt; 10 cfs)</strong> — Typical of small headwater streams, springs, or streams during drought/baseflow conditions. Shown as the lightest color (pale green) for quick identification of minimal flow.</li>
-              <li><strong style="color:var(--flow-2)">Low (10–100 cfs)</strong> — Common for small to mid-size streams under normal flow conditions. Darker teal provides contrast against the pale green above.</li>
-              <li><strong style="color:var(--flow-3)">Moderate (100–1,000 cfs)</strong> — Mid-range rivers or smaller rivers experiencing elevated flow from recent rainfall. Light cyan, easy to spot.</li>
-              <li><strong style="color:var(--flow-4)">High (1,000–10,000 cfs)</strong> — Large rivers under normal conditions, or smaller rivers during significant storm events or snowmelt. Deep blue signals significant flow.</li>
-              <li><strong style="color:var(--flow-5)">Very High (10,000–100,000 cfs)</strong> — Major rivers like the Ohio or Columbia, or any river during flood events. Pale indigo stands out against the dark map.</li>
-              <li><strong style="color:var(--flow-6)">Extreme (&gt; 100,000 cfs)</strong> — The largest rivers in the country (Mississippi, Columbia during peak), or catastrophic flood events. Dark violet marks the highest flows.</li>
+              <li><strong style="color:#b5f5db">Very Low (&lt; 10 cfs)</strong> — Typical of small headwater streams, springs, or streams during drought/baseflow conditions. Pale mint, the lightest color in the ramp.</li>
+              <li><strong style="color:#70bab1">Low (10–100 cfs)</strong> — Common for small to mid-size streams under normal flow conditions. Muted teal.</li>
+              <li><strong style="color:#3b8a94">Moderate (100–1,000 cfs)</strong> — Mid-range rivers or smaller rivers experiencing elevated flow from recent rainfall. Deep teal.</li>
+              <li><strong>High (1,000–10,000 cfs)</strong> — Large rivers under normal conditions, or smaller rivers during significant storm events or snowmelt. Steel blue on the map.</li>
+              <li><strong>Very High (10,000–100,000 cfs)</strong> — Major rivers like the Ohio or Columbia, or any river during flood events. Deep navy on the map.</li>
+              <li><strong>Extreme (&gt; 100,000 cfs)</strong> — The largest rivers in the country (Mississippi, Columbia during peak), or catastrophic flood events. Near-black indigo on the map.</li>
             </ul>
             <p>These are fixed thresholds based on absolute discharge values. They do not reflect percentile or return-period statistics for individual stations — a "Very High" reading at one station may be normal for a large river but represent a rare flood on a small stream. For station-specific flood thresholds, consult the <a href="https://waterdata.usgs.gov/" target="_blank">USGS Water Data for the Nation</a> site.</p>
           </div>
@@ -381,19 +381,20 @@
 // CONFIG
 // ═══════════════════════════════════════════
 const API_BASE = 'https://api.waterdata.usgs.gov/ogcapi/v0';
-const API_KEY = '';  // ← https://api.waterdata.usgs.gov/signup/
+const API_KEY = 'nAAeM3paYq4BNN1vLPeVF5WdPOC7oNXnkUj1tbKJ';  // ← https://api.waterdata.usgs.gov/signup/
 const PARAM_DISCHARGE = '00060';
 
 const FLOW_CLASSES = [
-  {min:0,max:10,color:'#86efac',label:'Very Low'},
-  {min:10,max:100,color:'#14b8a6',label:'Low'},
-  {min:100,max:1000,color:'#67e8f9',label:'Moderate'},
-  {min:1000,max:10000,color:'#3b82f6',label:'High'},
-  {min:10000,max:100000,color:'#a5b4fc',label:'Very High'},
-  {min:100000,max:Infinity,color:'#7c3aed',label:'Extreme'},
+  {min:0,max:10,color:'#b5f5db',label:'Very Low'},
+  {min:10,max:100,color:'#70bab1',label:'Low'},
+  {min:100,max:1000,color:'#3b8a94',label:'Moderate'},
+  {min:1000,max:10000,color:'#20527a',label:'High'},
+  {min:10000,max:100000,color:'#142657',label:'Very High'},
+  {min:100000,max:Infinity,color:'#010442',label:'Extreme'},
 ];
 
-const CHART_COLORS = ['#67e8f9','#86efac','#3b82f6','#a5b4fc','#14b8a6','#7c3aed','#22d3ee','#4ade80','#818cf8','#2dd4bf'];
+// Rainbow palette for chart lines — distinct regardless of flow class
+const CHART_COLORS = ['#f87171','#fb923c','#facc15','#4ade80','#22d3ee','#818cf8','#e879f9','#f472b6','#a3e635','#2dd4bf'];
 
 const STATES = {'AL':{name:'Alabama',bbox:[-88.47,30.22,-84.89,35.01]},'AK':{name:'Alaska',bbox:[-179.15,51.21,-129.97,71.39]},'AZ':{name:'Arizona',bbox:[-114.81,31.33,-109.04,37]},'AR':{name:'Arkansas',bbox:[-94.62,33,-89.64,36.5]},'CA':{name:'California',bbox:[-124.41,32.53,-114.13,42.01]},'CO':{name:'Colorado',bbox:[-109.06,36.99,-102.04,41]},'CT':{name:'Connecticut',bbox:[-73.73,40.98,-71.79,42.05]},'DE':{name:'Delaware',bbox:[-75.79,38.45,-75.05,39.84]},'FL':{name:'Florida',bbox:[-87.63,24.52,-80.03,31]},'GA':{name:'Georgia',bbox:[-85.61,30.36,-80.84,35]},'HI':{name:'Hawaii',bbox:[-160.24,18.91,-154.81,22.24]},'ID':{name:'Idaho',bbox:[-117.24,41.99,-111.04,49]},'IL':{name:'Illinois',bbox:[-91.51,36.97,-87.5,42.51]},'IN':{name:'Indiana',bbox:[-88.1,37.77,-84.78,41.76]},'IA':{name:'Iowa',bbox:[-96.64,40.38,-90.14,43.5]},'KS':{name:'Kansas',bbox:[-102.05,36.99,-94.59,40]},'KY':{name:'Kentucky',bbox:[-89.57,36.5,-81.96,39.15]},'LA':{name:'Louisiana',bbox:[-94.04,28.93,-88.82,33.02]},'ME':{name:'Maine',bbox:[-71.08,43.06,-66.95,47.46]},'MD':{name:'Maryland',bbox:[-79.49,37.91,-75.05,39.72]},'MA':{name:'Massachusetts',bbox:[-73.51,41.24,-69.93,42.89]},'MI':{name:'Michigan',bbox:[-90.42,41.7,-82.12,48.31]},'MN':{name:'Minnesota',bbox:[-97.24,43.5,-89.49,49.38]},'MS':{name:'Mississippi',bbox:[-91.66,30.17,-88.1,34.99]},'MO':{name:'Missouri',bbox:[-95.77,36,-89.1,40.61]},'MT':{name:'Montana',bbox:[-116.05,44.36,-104.04,49]},'NE':{name:'Nebraska',bbox:[-104.05,40,-95.31,43]},'NV':{name:'Nevada',bbox:[-120,35,-114.04,42]},'NH':{name:'New Hampshire',bbox:[-72.56,42.7,-70.7,45.31]},'NJ':{name:'New Jersey',bbox:[-75.56,38.93,-73.89,41.36]},'NM':{name:'New Mexico',bbox:[-109.05,31.33,-103,37]},'NY':{name:'New York',bbox:[-79.76,40.5,-71.86,45.02]},'NC':{name:'North Carolina',bbox:[-84.32,33.84,-75.46,36.59]},'ND':{name:'North Dakota',bbox:[-104.05,45.94,-96.55,49]},'OH':{name:'Ohio',bbox:[-84.82,38.4,-80.52,42.33]},'OK':{name:'Oklahoma',bbox:[-103,33.62,-94.43,37]},'OR':{name:'Oregon',bbox:[-124.57,41.99,-116.46,46.29]},'PA':{name:'Pennsylvania',bbox:[-80.52,39.72,-74.69,42.27]},'RI':{name:'Rhode Island',bbox:[-71.86,41.15,-71.12,42.02]},'SC':{name:'South Carolina',bbox:[-83.35,32.05,-78.54,35.21]},'SD':{name:'South Dakota',bbox:[-104.06,42.48,-96.44,45.94]},'TN':{name:'Tennessee',bbox:[-90.31,34.98,-81.65,36.68]},'TX':{name:'Texas',bbox:[-106.65,25.84,-93.51,36.5]},'UT':{name:'Utah',bbox:[-114.05,37,-109.04,42]},'VT':{name:'Vermont',bbox:[-73.44,42.73,-71.46,45.02]},'VA':{name:'Virginia',bbox:[-83.68,36.54,-75.24,39.47]},'WA':{name:'Washington',bbox:[-124.73,45.54,-116.92,49]},'WV':{name:'West Virginia',bbox:[-82.64,37.2,-77.72,40.64]},'WI':{name:'Wisconsin',bbox:[-92.89,42.49,-86.25,47.08]},'WY':{name:'Wyoming',bbox:[-111.06,40.99,-104.05,45.01]}};
 
@@ -455,6 +456,9 @@ function setStatus(msg,loading=false){document.getElementById('statusText').text
 function getLimit(){return parseInt(document.getElementById('limitSelect').value)}
 function apiParam(){return API_KEY?`&api_key=${API_KEY}`:''}
 function classifyFlow(v){for(const c of FLOW_CLASSES)if(v>=c.min&&v<c.max)return c;return FLOW_CLASSES[5]}
+// Readable text color for popups — dark flow colors are invisible on dark bg
+const FLOW_TEXT = {'#b5f5db':'#b5f5db','#70bab1':'#70bab1','#3b8a94':'#5ab8c4','#20527a':'#5a9ac4','#142657':'#7a9fd4','#010442':'#9a8ae8'};
+function flowTextColor(c){return FLOW_TEXT[c]||c}
 function radiusForFlow(v){return v<=0?4:4+Math.min(10,Math.log10(v+1)*2.5)}
 function formatNum(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'k';return n.toFixed(1)}
 
@@ -503,8 +507,10 @@ function renderMarkers(features){
     const p=f.properties||{};
     const v=parseFloat(p.value);if(isNaN(v))return;
     const cls=classifyFlow(v);
+    // Use a light stroke for dark flow classes so they pop on the dark basemap
+    const strokeColor = (v >= 1000) ? '#5a8a8a' : cls.color;
     const marker=L.circleMarker([lat,lng],{
-      radius:radiusForFlow(v),fillColor:cls.color,fillOpacity:.8,color:cls.color,weight:1.2,opacity:.35
+      radius:radiusForFlow(v),fillColor:cls.color,fillOpacity:.85,color:strokeColor,weight:1.5,opacity:.6
     });
     const locId=p.monitoring_location_id||'—';
     const sn=locId.replace('USGS-','');
@@ -513,11 +519,12 @@ function renderMarkers(features){
     const st=p.approval_status||'—';
     const q=p.qualifier;
     const bg=cls.color+'15';
+    const tc=flowTextColor(cls.color);
     marker.bindPopup(`
       <div class="popup-title">${locId}</div>
-      <div class="popup-flow" style="background:${bg};color:${cls.color}">${formatNum(v)} <span style="font-size:11px;opacity:.7">${u}</span></div>
+      <div class="popup-flow" style="background:${bg};color:${tc}">${formatNum(v)} <span style="font-size:11px;opacity:.7">${u}</span></div>
       <div style="margin-top:8px">
-        <div class="popup-row"><span class="k">Class</span><span class="v" style="color:${cls.color}">${cls.label}</span></div>
+        <div class="popup-row"><span class="k">Class</span><span class="v" style="color:${tc}">${cls.label}</span></div>
         <div class="popup-row"><span class="k">Time</span><span class="v">${ts}</span></div>
         <div class="popup-row"><span class="k">Status</span><span class="v">${st}</span></div>
         ${q?`<div class="popup-row"><span class="k">Qualifier</span><span class="v">${q}</span></div>`:''}
@@ -601,7 +608,7 @@ async function fetchHistorical(){
         const nx=(d.links||[]).find(l=>l.rel==='next');url=nx?nx.href:null;
       }
       const pts=feats.map(f=>({x:new Date(f.properties.time),y:parseFloat(f.properties.value)})).filter(p=>!isNaN(p.y)).sort((a,b)=>a.x-b.x);
-      datasets.push({label:locId,data:pts,borderColor:info.color,backgroundColor:info.color+'15',borderWidth:1.5,pointRadius:0,pointHitRadius:6,tension:.2,fill:false});
+      datasets.push({label:locId,data:pts,borderColor:info.color,backgroundColor:info.color+'15',borderWidth:3,pointRadius:0,pointHitRadius:6,tension:.2,fill:false});
     }catch(e){console.error(`${locId}:`,e)}
   }
   setStatus(`History loaded for ${datasets.length} station(s)`);
