@@ -6,6 +6,7 @@
 <title>USGS Streamflow Viewer</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,28 +14,41 @@
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root {
-    --bg:#0a0a0f;--surface:#100e18;--surface-raised:#161321;
-    --border:#2a2440;--border-glow:#3d2b6b;
-    --text:#d8d0e8;--text-muted:#7a6f96;
-    --accent:#bf5af2;--accent-dim:#7a3aaf;
-    --cyan:#32d9cb;--neon-pink:#ff2d7b;--neon-blue:#4d9dff;--warm-gold:#e8b84b;
-    --flow-1:#ff2d55;--flow-2:#ff6f3c;--flow-3:#e8b84b;
-    --flow-4:#32d9cb;--flow-5:#bf5af2;--flow-6:#ff2d7b;
-    --radius:8px;
-    --font:'DM Sans',-apple-system,sans-serif;
-    --mono:'JetBrains Mono',monospace;
-    --glow-sm:0 0 6px rgba(191,90,242,0.25);
-    --glow-md:0 0 14px rgba(191,90,242,0.3);
+    /* ── Deep water palette ──────────── */
+    --bg:            #001212;
+    --surface:       #001a1a;
+    --surface-raised:#002626;
+    --border:        #003d3d;
+    --border-glow:   #005555;
+    --text:          #c8e6e6;
+    --text-muted:    #5a8a8a;
+    --accent:        #22d3ee;     /* cyan primary */
+    --accent-dim:    #0e7490;
+    --accent-soft:   #164e63;
+
+    /* Flow classes — hues 130–250 */
+    --flow-1: #3ddc84;  /* h≈140  bright green   */
+    --flow-2: #2ee8b7;  /* h≈162  jade            */
+    --flow-3: #22d3ee;  /* h≈187  cyan            */
+    --flow-4: #38bdf8;  /* h≈199  sky blue        */
+    --flow-5: #6366f1;  /* h≈239  indigo          */
+    --flow-6: #8b5cf6;  /* h≈250  violet          */
+
+    --radius: 8px;
+    --font: 'DM Sans', -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+    --glow-sm: 0 0 6px rgba(34,211,238,0.2);
+    --glow-md: 0 0 14px rgba(34,211,238,0.25);
   }
   html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);overflow:hidden}
-  .app{display:grid;grid-template-columns:340px 1fr;grid-template-rows:1fr;height:100vh}
+  .app{display:grid;grid-template-columns:360px 1fr;grid-template-rows:1fr;height:100vh}
 
   /* ── Sidebar ───────────────────────── */
   .sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;z-index:1000;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
-  .sidebar-header{padding:20px 20px 16px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(191,90,242,0.06) 0%,transparent 100%)}
+  .sidebar-header{padding:20px 20px 16px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(34,211,238,0.04) 0%,transparent 100%)}
   .sidebar-header h1{font-size:17px;font-weight:700;letter-spacing:-0.3px;display:flex;align-items:center;gap:8px}
-  .sidebar-header h1 .dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);display:inline-block;box-shadow:0 0 8px var(--cyan);animation:pulse 2s ease-in-out infinite}
-  @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--cyan)}50%{opacity:.4;box-shadow:0 0 2px var(--cyan)}}
+  .sidebar-header h1 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;box-shadow:0 0 8px var(--accent);animation:pulse 2.5s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--accent)}50%{opacity:.35;box-shadow:0 0 2px var(--accent)}}
   .sidebar-header p{margin-top:6px;font-size:12px;color:var(--text-muted);line-height:1.5}
   .section{padding:16px 20px;border-bottom:1px solid var(--border)}
   .section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);margin-bottom:12px}
@@ -42,14 +56,14 @@
   /* ── Controls ──────────────────────── */
   .control-row{display:flex;gap:8px;margin-bottom:10px;align-items:center}
   .control-row label{font-size:13px;font-weight:500;min-width:50px;color:var(--text-muted)}
-  select,input[type="text"],input[type="number"]{flex:1;background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;font-size:13px;font-family:var(--font);color:var(--text);outline:none;transition:border-color .2s,box-shadow .2s}
+  select,input[type="text"]{flex:1;background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;font-size:13px;font-family:var(--font);color:var(--text);outline:none;transition:border-color .2s,box-shadow .2s}
   select:focus,input:focus{border-color:var(--accent);box-shadow:var(--glow-sm)}
   select option{background:var(--surface)}
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-raised);color:var(--text);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;width:100%}
   .btn:hover{background:var(--border);border-color:var(--border-glow)}
   .btn-primary{background:var(--accent-dim);border-color:var(--accent-dim);color:#fff}
-  .btn-primary:hover{background:var(--accent);box-shadow:var(--glow-md)}
-  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn-primary:hover{background:var(--accent);color:var(--bg);box-shadow:var(--glow-md)}
+  .btn:disabled{opacity:.35;cursor:not-allowed}
   .btn-sm{padding:5px 10px;font-size:11px;width:auto}
 
   /* ── Toggle ────────────────────────── */
@@ -62,17 +76,35 @@
   .toggle input:checked+.slider{background:var(--accent-dim);box-shadow:var(--glow-sm)}
   .toggle input:checked+.slider::before{transform:translateX(16px);background:var(--accent)}
 
+  /* ── Collapsible / Accordion ────────── */
+  .accordion{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:8px}
+  .accordion-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-raised);border:none;color:var(--text);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+  .accordion-trigger:hover{background:var(--border)}
+  .accordion-trigger .arrow{font-size:10px;transition:transform .2s;color:var(--text-muted)}
+  .accordion-trigger.open .arrow{transform:rotate(90deg)}
+  .accordion-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
+  .accordion-body.open{max-height:2000px}
+  .accordion-content{padding:12px 14px;font-size:12.5px;line-height:1.7;color:var(--text-muted)}
+  .accordion-content p{margin-bottom:10px}
+  .accordion-content p:last-child{margin-bottom:0}
+  .accordion-content strong{color:var(--text);font-weight:600}
+  .accordion-content code{font-family:var(--mono);font-size:11px;background:var(--bg);padding:1px 5px;border-radius:3px;color:var(--accent)}
+  .accordion-content a{color:var(--accent);text-decoration:none}
+  .accordion-content a:hover{text-decoration:underline}
+  .accordion-content ul{margin:6px 0 10px 18px;padding:0}
+  .accordion-content ul li{margin-bottom:4px}
+
   /* ── Legend ─────────────────────────── */
   .legend-items{display:flex;flex-direction:column;gap:6px}
   .legend-item{display:flex;align-items:center;gap:10px;font-size:12px}
-  .legend-swatch{width:14px;height:14px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.08)}
+  .legend-swatch{width:14px;height:14px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.06)}
   .legend-label{color:var(--text-muted)}
   .legend-value{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--text)}
 
   /* ── Stats ──────────────────────────── */
   .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .stat-card{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px}
-  .stat-card .stat-value{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--cyan)}
+  .stat-card .stat-value{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)}
   .stat-card .stat-label{font-size:11px;color:var(--text-muted);margin-top:2px}
 
   /* ── Pinned ─────────────────────────── */
@@ -81,7 +113,7 @@
   .pinned-color{width:10px;height:10px;border-radius:50%;flex-shrink:0}
   .pinned-item .pinned-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .pinned-remove{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;line-height:1;padding:0 2px;width:auto}
-  .pinned-remove:hover{color:var(--neon-pink)}
+  .pinned-remove:hover{color:#f87171}
 
   /* ── Status ─────────────────────────── */
   .status-bar{margin-top:auto;padding:12px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px}
@@ -110,19 +142,19 @@
   .popup-row .v{font-family:var(--mono);font-weight:500;text-align:right}
   .popup-flow{margin-top:8px;padding:8px 10px;border-radius:6px;text-align:center;font-family:var(--mono);font-size:16px;font-weight:700}
   .popup-actions{display:flex;gap:6px;margin-top:8px}
-  .popup-btn{flex:1;padding:5px 8px;font-size:11px;font-family:var(--font);font-weight:600;border-radius:5px;border:1px solid var(--border);background:var(--surface-raised);color:var(--text);cursor:pointer;text-align:center;transition:all .15s;text-decoration:none}
+  .popup-btn{flex:1;padding:5px 8px;font-size:11px;font-family:var(--font);font-weight:600;border-radius:5px;border:1px solid var(--border);background:var(--surface-raised);color:var(--text);cursor:pointer;text-align:center;transition:all .15s;text-decoration:none;display:inline-block}
   .popup-btn:hover{border-color:var(--accent);box-shadow:var(--glow-sm)}
   .popup-btn-accent{background:var(--accent-dim);border-color:var(--accent-dim);color:#fff}
 
   /* ── Leaflet controls ───────────────── */
   .leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border)!important}
   .leaflet-control-zoom a:hover{background:var(--surface-raised)!important}
-  .leaflet-control-attribution{background:rgba(10,10,15,.85)!important;color:var(--text-muted)!important;font-size:10px!important}
+  .leaflet-control-attribution{background:rgba(0,18,18,.85)!important;color:var(--text-muted)!important;font-size:10px!important}
   .leaflet-control-attribution a{color:var(--accent)!important}
 
   @media(max-width:768px){
     .app{grid-template-columns:1fr;grid-template-rows:auto 1fr}
-    .sidebar{max-height:40vh;border-right:none;border-bottom:1px solid var(--border)}
+    .sidebar{max-height:42vh;border-right:none;border-bottom:1px solid var(--border)}
     .chart-drawer.open{height:200px}
   }
 </style>
@@ -132,9 +164,10 @@
   <aside class="sidebar">
     <div class="sidebar-header">
       <h1><span class="dot"></span> USGS Streamflow Viewer</h1>
-      <p>Real-time &amp; historical discharge data. Pin stations to compare hydrographs.</p>
+      <p>Real-time and historical stream discharge from USGS monitoring stations. Pin stations to compare hydrographs over time.</p>
     </div>
 
+    <!-- ── Query ──────────────────────── -->
     <div class="section">
       <div class="section-title">Query</div>
       <div class="control-row">
@@ -159,14 +192,17 @@
       </div>
     </div>
 
+    <!-- ── Layers ─────────────────────── -->
     <div class="section">
       <div class="section-title">Layers</div>
       <div class="toggle-row">
         <span>NHD Stream Lines</span>
         <label class="toggle"><input type="checkbox" id="toggleNHD"><span class="slider"></span></label>
       </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">National Hydrography Dataset flowlines. Small-scale lines appear at wide zooms; high-resolution detail appears as you zoom in.</div>
     </div>
 
+    <!-- ── Legend ──────────────────────── -->
     <div class="section">
       <div class="section-title">Discharge (cfs)</div>
       <div class="legend-items">
@@ -179,6 +215,7 @@
       </div>
     </div>
 
+    <!-- ── Stats ──────────────────────── -->
     <div class="section">
       <div class="section-title">Summary</div>
       <div class="stats-grid">
@@ -189,6 +226,7 @@
       </div>
     </div>
 
+    <!-- ── Comparison ─────────────────── -->
     <div class="section">
       <div class="section-title">Comparison <span style="font-weight:400;text-transform:none;letter-spacing:0">(click markers to pin)</span></div>
       <div class="control-row">
@@ -210,12 +248,106 @@
       </div>
     </div>
 
-    <div class="section" style="font-size:12px;color:var(--text-muted);line-height:1.6">
-      <div class="section-title">About</div>
-      USGS <a href="https://api.waterdata.usgs.gov/ogcapi/v0/" target="_blank" style="color:var(--accent)">OGC API</a>
-      — <code style="font-family:var(--mono);font-size:11px">latest-continuous</code> + <code style="font-family:var(--mono);font-size:11px">continuous</code>.
-      Parameter <code style="font-family:var(--mono);font-size:11px">00060</code> (Discharge).
-      Streams from <a href="https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer" target="_blank" style="color:var(--accent)">NHD</a>.
+    <!-- ── Documentation ──────────────── -->
+    <div class="section">
+      <div class="section-title">Documentation</div>
+
+      <!-- How to use -->
+      <div class="accordion">
+        <button class="accordion-trigger" onclick="toggleAccordion(this)">
+          How to Use This Tool <span class="arrow">&#9654;</span>
+        </button>
+        <div class="accordion-body">
+          <div class="accordion-content">
+            <p><strong>Loading data:</strong> Select a state from the dropdown and click <strong>Load Streamflow</strong> to fetch the latest discharge readings for all USGS monitoring stations in that state. Alternatively, pan and zoom the map to your area of interest, then click <strong>Load by Map Extent</strong> to query within the current viewport. The <strong>Limit</strong> control caps how many station records are returned per request.</p>
+            <p><strong>Reading the map:</strong> Each circle marker represents a USGS streamgage. The marker color indicates the current discharge magnitude according to the legend — green for very low flows, through cyan and blue for moderate and high flows, up to violet for extremely high discharge. Marker size also scales logarithmically with flow value, so larger circles mean higher flow.</p>
+            <p><strong>Station details:</strong> Click any marker to open a popup showing the station ID, current discharge value, measurement timestamp, data approval status, and any data qualifiers. From the popup you can <strong>pin</strong> the station for hydrograph comparison, or jump to the official USGS monitoring location page.</p>
+            <p><strong>Comparing stations:</strong> Pin up to 10 stations by clicking the "Pin to Compare" button in each popup. Choose a lookback window (1–30 days) from the <strong>Days</strong> dropdown, then click <strong>Compare Pinned</strong>. The chart drawer will open at the bottom showing overlaid hydrographs for all pinned stations. Hover over the chart to see exact values at any point in time.</p>
+            <p><strong>Stream lines:</strong> Toggle the <strong>NHD Stream Lines</strong> layer to overlay the USGS National Hydrography Dataset flowline network on the map. At wide zoom levels you'll see the small-scale nationwide network; as you zoom in, high-resolution flowlines appear with full detail down to headwater streams.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- About the data -->
+      <div class="accordion">
+        <button class="accordion-trigger" onclick="toggleAccordion(this)">
+          About the Data <span class="arrow">&#9654;</span>
+        </button>
+        <div class="accordion-body">
+          <div class="accordion-content">
+            <p><strong>Source:</strong> All streamflow data comes from the <a href="https://api.waterdata.usgs.gov/ogcapi/v0/" target="_blank">USGS Water Data OGC API</a>, a modernized, OGC-compliant interface to the National Water Information System (NWIS). This tool queries two collections:</p>
+            <ul>
+              <li><code>latest-continuous</code> — the single most recent observation for each time series, used for the map markers.</li>
+              <li><code>continuous</code> — the full 15-minute interval time series, used when you pull historical data for the comparison chart.</li>
+            </ul>
+            <p><strong>Parameter:</strong> This viewer displays parameter code <code>00060</code>, which is <strong>Discharge (cfs)</strong> — the volume of water flowing past the streamgage, measured in cubic feet per second. This is the most commonly reported hydrologic variable and the primary output of most USGS streamgage stations.</p>
+            <p><strong>Approval status:</strong> Data may be marked <strong>Approved</strong> (reviewed and published) or <strong>Provisional</strong> (subject to revision). Provisional data has not yet completed the USGS review process. The USGS states that provisional data are released on the condition that neither the USGS nor the United States Government may be held liable for any damages resulting from its use.</p>
+            <p><strong>Qualifiers:</strong> Some readings carry qualifier codes such as <code>Ice</code> (sensor affected by ice conditions), <code>Eqp</code> (equipment malfunction), or <code>Estimated</code>. These appear in the station popup when present.</p>
+            <p><strong>Continuous vs. daily:</strong> Continuous ("instantaneous value" or "IV") data are typically recorded at 15-minute intervals by automated sensors. Daily values are statistical summaries (mean, min, max) computed from the continuous record. This tool uses the continuous record for maximum temporal resolution.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stream lines -->
+      <div class="accordion">
+        <button class="accordion-trigger" onclick="toggleAccordion(this)">
+          NHD Stream Lines <span class="arrow">&#9654;</span>
+        </button>
+        <div class="accordion-body">
+          <div class="accordion-content">
+            <p>The stream line overlay comes from the <a href="https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer" target="_blank">USGS National Hydrography Dataset (NHD)</a> map service. The NHD is a comprehensive geospatial dataset encoding surface water features including rivers, streams, canals, lakes, and reservoirs.</p>
+            <p>This overlay renders two scale-dependent layers from the service:</p>
+            <ul>
+              <li><strong>Small-scale flowlines</strong> (layer 4) — visible at wider zoom levels, showing the generalized national drainage network.</li>
+              <li><strong>Large-scale flowlines</strong> (layer 6) — visible when zoomed in closer, showing high-resolution detail down to 1:24,000 scale including headwater streams, ditches, and canals.</li>
+            </ul>
+            <p>The NHD is not a real-time dataset — it represents the mapped drainage network geometry. Flowline colors on this layer reflect NHD's own symbology (blue) and are <em>not</em> colored by current discharge values. To see which streams are being actively monitored, compare the flowlines to the streamgage markers.</p>
+            <p>Note: As of October 2023 the NHD was retired in favor of the <a href="https://www.usgs.gov/3dhp" target="_blank">3D Hydrography Program (3DHP)</a>. The NHD data remains available and is still served through the map service used here, but future updates will come through 3DHP.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Discharge classification -->
+      <div class="accordion">
+        <button class="accordion-trigger" onclick="toggleAccordion(this)">
+          Discharge Classification <span class="arrow">&#9654;</span>
+        </button>
+        <div class="accordion-body">
+          <div class="accordion-content">
+            <p>Markers are classified into six logarithmic bins based on instantaneous discharge in cubic feet per second (cfs):</p>
+            <ul>
+              <li><strong style="color:var(--flow-1)">Very Low (&lt; 10 cfs)</strong> — Typical of small headwater streams, springs, or streams during drought/baseflow conditions.</li>
+              <li><strong style="color:var(--flow-2)">Low (10–100 cfs)</strong> — Common for small to mid-size streams under normal flow conditions.</li>
+              <li><strong style="color:var(--flow-3)">Moderate (100–1,000 cfs)</strong> — Mid-range rivers or smaller rivers experiencing elevated flow from recent rainfall.</li>
+              <li><strong style="color:var(--flow-4)">High (1,000–10,000 cfs)</strong> — Large rivers under normal conditions, or smaller rivers during significant storm events or snowmelt.</li>
+              <li><strong style="color:var(--flow-5)">Very High (10,000–100,000 cfs)</strong> — Major rivers like the Ohio or Columbia, or any river during flood events.</li>
+              <li><strong style="color:var(--flow-6)">Extreme (&gt; 100,000 cfs)</strong> — The largest rivers in the country (Mississippi, Columbia during peak), or catastrophic flood events.</li>
+            </ul>
+            <p>These are fixed thresholds based on absolute discharge values. They do not reflect percentile or return-period statistics for individual stations — a "Very High" reading at one station may be normal for a large river but represent a rare flood on a small stream. For station-specific flood thresholds, consult the <a href="https://waterdata.usgs.gov/" target="_blank">USGS Water Data for the Nation</a> site.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- API details -->
+      <div class="accordion">
+        <button class="accordion-trigger" onclick="toggleAccordion(this)">
+          API &amp; Technical Details <span class="arrow">&#9654;</span>
+        </button>
+        <div class="accordion-body">
+          <div class="accordion-content">
+            <p>This tool makes client-side HTTP requests directly to the USGS OGC API. No backend server is required — it runs entirely as a static HTML page, suitable for GitHub Pages deployment.</p>
+            <p><strong>Endpoints used:</strong></p>
+            <ul>
+              <li><code>GET /collections/latest-continuous/items</code> — fetches the most recent discharge observation per station, filtered by bounding box and parameter code.</li>
+              <li><code>GET /collections/continuous/items</code> — fetches historical 15-minute interval time series for specific monitoring locations, filtered by datetime range.</li>
+            </ul>
+            <p><strong>Rate limits:</strong> The USGS API allows unauthenticated requests but imposes rate limits. For heavier use, <a href="https://api.waterdata.usgs.gov/signup/" target="_blank">sign up for a free API key</a> and paste it into the <code>API_KEY</code> constant in the source code. Authenticated requests receive significantly higher rate limits.</p>
+            <p><strong>Response format:</strong> Data is returned as GeoJSON (<code>application/geo+json</code>). Each feature includes a Point geometry (the station's lat/lon) and properties like <code>monitoring_location_id</code>, <code>value</code>, <code>time</code>, <code>unit_of_measure</code>, <code>approval_status</code>, and <code>qualifier</code>.</p>
+            <p><strong>Pagination:</strong> The API returns up to 10,000 records per page. This tool follows <code>next</code> links automatically until the requested limit is reached. For historical queries, a 30-day window at 15-minute intervals produces ~2,880 records per station.</p>
+            <p><strong>Libraries:</strong> <a href="https://leafletjs.com/" target="_blank">Leaflet</a> for mapping, <a href="https://developers.arcgis.com/esri-leaflet/" target="_blank">esri-leaflet</a> for NHD map service integration, <a href="https://www.chartjs.org/" target="_blank">Chart.js</a> with the date-fns adapter for time-series charting.</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="status-bar" id="statusBar">
@@ -224,14 +356,13 @@
     </div>
   </aside>
 
+  <!-- ══════════ Map + Chart ══════════ -->
   <div class="map-wrap">
     <div id="map"></div>
     <div class="chart-drawer" id="chartDrawer">
       <div class="chart-header">
         <h3 id="chartTitle">Hydrograph Comparison</h3>
-        <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn btn-sm" onclick="toggleChart()" style="width:auto;padding:4px 10px">Close</button>
-        </div>
+        <button class="btn btn-sm" onclick="toggleChart()" style="width:auto;padding:4px 10px">Close</button>
       </div>
       <div class="chart-body">
         <canvas id="hydrograph"></canvas>
@@ -243,20 +374,22 @@
 
 <script>
 // ═══════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════
 const API_BASE = 'https://api.waterdata.usgs.gov/ogcapi/v0';
-const API_KEY = '';  // ← Your key from https://api.waterdata.usgs.gov/signup/
+const API_KEY = '';  // ← https://api.waterdata.usgs.gov/signup/
 const PARAM_DISCHARGE = '00060';
 
 const FLOW_CLASSES = [
-  {min:0,max:10,color:'#ff2d55',label:'Very Low'},
-  {min:10,max:100,color:'#ff6f3c',label:'Low'},
-  {min:100,max:1000,color:'#e8b84b',label:'Moderate'},
-  {min:1000,max:10000,color:'#32d9cb',label:'High'},
-  {min:10000,max:100000,color:'#bf5af2',label:'Very High'},
-  {min:100000,max:Infinity,color:'#ff2d7b',label:'Extreme'},
+  {min:0,max:10,color:'#3ddc84',label:'Very Low'},
+  {min:10,max:100,color:'#2ee8b7',label:'Low'},
+  {min:100,max:1000,color:'#22d3ee',label:'Moderate'},
+  {min:1000,max:10000,color:'#38bdf8',label:'High'},
+  {min:10000,max:100000,color:'#6366f1',label:'Very High'},
+  {min:100000,max:Infinity,color:'#8b5cf6',label:'Extreme'},
 ];
 
-const CHART_COLORS = ['#bf5af2','#32d9cb','#ff2d7b','#e8b84b','#4d9dff','#ff6f3c','#ff2d55','#7a3aaf','#50e3a4','#f5a3c7'];
+const CHART_COLORS = ['#22d3ee','#3ddc84','#38bdf8','#8b5cf6','#6366f1','#2ee8b7','#a78bfa','#67e8f9','#86efac','#818cf8'];
 
 const STATES = {'AL':{name:'Alabama',bbox:[-88.47,30.22,-84.89,35.01]},'AK':{name:'Alaska',bbox:[-179.15,51.21,-129.97,71.39]},'AZ':{name:'Arizona',bbox:[-114.81,31.33,-109.04,37]},'AR':{name:'Arkansas',bbox:[-94.62,33,-89.64,36.5]},'CA':{name:'California',bbox:[-124.41,32.53,-114.13,42.01]},'CO':{name:'Colorado',bbox:[-109.06,36.99,-102.04,41]},'CT':{name:'Connecticut',bbox:[-73.73,40.98,-71.79,42.05]},'DE':{name:'Delaware',bbox:[-75.79,38.45,-75.05,39.84]},'FL':{name:'Florida',bbox:[-87.63,24.52,-80.03,31]},'GA':{name:'Georgia',bbox:[-85.61,30.36,-80.84,35]},'HI':{name:'Hawaii',bbox:[-160.24,18.91,-154.81,22.24]},'ID':{name:'Idaho',bbox:[-117.24,41.99,-111.04,49]},'IL':{name:'Illinois',bbox:[-91.51,36.97,-87.5,42.51]},'IN':{name:'Indiana',bbox:[-88.1,37.77,-84.78,41.76]},'IA':{name:'Iowa',bbox:[-96.64,40.38,-90.14,43.5]},'KS':{name:'Kansas',bbox:[-102.05,36.99,-94.59,40]},'KY':{name:'Kentucky',bbox:[-89.57,36.5,-81.96,39.15]},'LA':{name:'Louisiana',bbox:[-94.04,28.93,-88.82,33.02]},'ME':{name:'Maine',bbox:[-71.08,43.06,-66.95,47.46]},'MD':{name:'Maryland',bbox:[-79.49,37.91,-75.05,39.72]},'MA':{name:'Massachusetts',bbox:[-73.51,41.24,-69.93,42.89]},'MI':{name:'Michigan',bbox:[-90.42,41.7,-82.12,48.31]},'MN':{name:'Minnesota',bbox:[-97.24,43.5,-89.49,49.38]},'MS':{name:'Mississippi',bbox:[-91.66,30.17,-88.1,34.99]},'MO':{name:'Missouri',bbox:[-95.77,36,-89.1,40.61]},'MT':{name:'Montana',bbox:[-116.05,44.36,-104.04,49]},'NE':{name:'Nebraska',bbox:[-104.05,40,-95.31,43]},'NV':{name:'Nevada',bbox:[-120,35,-114.04,42]},'NH':{name:'New Hampshire',bbox:[-72.56,42.7,-70.7,45.31]},'NJ':{name:'New Jersey',bbox:[-75.56,38.93,-73.89,41.36]},'NM':{name:'New Mexico',bbox:[-109.05,31.33,-103,37]},'NY':{name:'New York',bbox:[-79.76,40.5,-71.86,45.02]},'NC':{name:'North Carolina',bbox:[-84.32,33.84,-75.46,36.59]},'ND':{name:'North Dakota',bbox:[-104.05,45.94,-96.55,49]},'OH':{name:'Ohio',bbox:[-84.82,38.4,-80.52,42.33]},'OK':{name:'Oklahoma',bbox:[-103,33.62,-94.43,37]},'OR':{name:'Oregon',bbox:[-124.57,41.99,-116.46,46.29]},'PA':{name:'Pennsylvania',bbox:[-80.52,39.72,-74.69,42.27]},'RI':{name:'Rhode Island',bbox:[-71.86,41.15,-71.12,42.02]},'SC':{name:'South Carolina',bbox:[-83.35,32.05,-78.54,35.21]},'SD':{name:'South Dakota',bbox:[-104.06,42.48,-96.44,45.94]},'TN':{name:'Tennessee',bbox:[-90.31,34.98,-81.65,36.68]},'TX':{name:'Texas',bbox:[-106.65,25.84,-93.51,36.5]},'UT':{name:'Utah',bbox:[-114.05,37,-109.04,42]},'VT':{name:'Vermont',bbox:[-73.44,42.73,-71.46,45.02]},'VA':{name:'Virginia',bbox:[-83.68,36.54,-75.24,39.47]},'WA':{name:'Washington',bbox:[-124.73,45.54,-116.92,49]},'WV':{name:'West Virginia',bbox:[-82.64,37.2,-77.72,40.64]},'WI':{name:'Wisconsin',bbox:[-92.89,42.49,-86.25,47.08]},'WY':{name:'Wyoming',bbox:[-111.06,40.99,-104.05,45.01]}};
 
@@ -265,22 +398,22 @@ const STATES = {'AL':{name:'Alabama',bbox:[-88.47,30.22,-84.89,35.01]},'AK':{nam
 // ═══════════════════════════════════════════
 const map = L.map('map',{center:[39.5,-98.5],zoom:5});
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a> | <a href="https://waterdata.usgs.gov">USGS</a>',
+  attribution:'&copy; <a href="https://openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a> | <a href="https://waterdata.usgs.gov">USGS</a>',
   maxZoom:19
 }).addTo(map);
 
 let markersLayer = L.layerGroup().addTo(map);
-let currentData = [];
 
-// NHD WMS
-const nhdLayer = L.tileLayer.wms('https://hydro.nationalmap.gov/arcgis/services/nhd/MapServer/WMSServer',{
-  layers:'6',
-  format:'image/png',
-  transparent:true,
-  opacity:0.45,
-  maxZoom:19,
-  attribution:'NHD © USGS'
+// ── NHD via esri-leaflet dynamicMapLayer ──
+const nhdLayer = L.esri.dynamicMapLayer({
+  url: 'https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer',
+  layers: [4, 6],      // small-scale + large-scale flowlines
+  opacity: 0.55,
+  transparent: true,
+  f: 'image',
+  attribution: 'NHD © USGS',
 });
+
 document.getElementById('toggleNHD').addEventListener('change', e => {
   e.target.checked ? nhdLayer.addTo(map) : map.removeLayer(nhdLayer);
 });
@@ -295,6 +428,21 @@ stateSelect.addEventListener('change',()=>{
   const bb=STATES[c].bbox;
   map.fitBounds([[bb[1],bb[0]],[bb[3],bb[2]]],{padding:[20,20]});
 });
+
+// ═══════════════════════════════════════════
+// ACCORDION
+// ═══════════════════════════════════════════
+function toggleAccordion(btn) {
+  const body = btn.nextElementSibling;
+  const isOpen = body.classList.contains('open');
+  // Close all first
+  document.querySelectorAll('.accordion-body').forEach(b => b.classList.remove('open'));
+  document.querySelectorAll('.accordion-trigger').forEach(t => t.classList.remove('open'));
+  if (!isOpen) {
+    body.classList.add('open');
+    btn.classList.add('open');
+  }
+}
 
 // ═══════════════════════════════════════════
 // HELPERS
@@ -314,12 +462,10 @@ async function fetchData(){
   if(!c)return fetchByBbox();
   await doFetch(`bbox=${STATES[c].bbox.join(',')}`);
 }
-
 async function fetchByBbox(){
   const b=map.getBounds();
   await doFetch(`bbox=${[b.getWest().toFixed(4),b.getSouth().toFixed(4),b.getEast().toFixed(4),b.getNorth().toFixed(4)].join(',')}`);
 }
-
 async function doFetch(spatialFilter){
   const limit=getLimit();
   const url=`${API_BASE}/collections/latest-continuous/items?f=json&parameter_code=${PARAM_DISCHARGE}&${spatialFilter}&limit=${limit}&properties=monitoring_location_id,value,unit_of_measure,time,approval_status,qualifier${apiParam()}`;
@@ -335,7 +481,6 @@ async function doFetch(spatialFilter){
       const nx=(d.links||[]).find(l=>l.rel==='next');
       fUrl=(nx&&all.length<limit)?nx.href:null;pg++;
     }
-    currentData=all;
     renderMarkers(all);
     updateStats(all);
     setStatus(`Loaded ${all.length.toLocaleString()} stations`);
@@ -344,7 +489,7 @@ async function doFetch(spatialFilter){
 }
 
 // ═══════════════════════════════════════════
-// RENDER MARKERS
+// RENDER
 // ═══════════════════════════════════════════
 function renderMarkers(features){
   markersLayer.clearLayers();
@@ -355,7 +500,7 @@ function renderMarkers(features){
     const v=parseFloat(p.value);if(isNaN(v))return;
     const cls=classifyFlow(v);
     const marker=L.circleMarker([lat,lng],{
-      radius:radiusForFlow(v),fillColor:cls.color,fillOpacity:.85,color:cls.color,weight:1,opacity:.4
+      radius:radiusForFlow(v),fillColor:cls.color,fillOpacity:.8,color:cls.color,weight:1.2,opacity:.35
     });
     const locId=p.monitoring_location_id||'—';
     const sn=locId.replace('USGS-','');
@@ -363,7 +508,7 @@ function renderMarkers(features){
     const u=p.unit_of_measure||'cfs';
     const st=p.approval_status||'—';
     const q=p.qualifier;
-    const bg=cls.color+'18';
+    const bg=cls.color+'15';
     marker.bindPopup(`
       <div class="popup-title">${locId}</div>
       <div class="popup-flow" style="background:${bg};color:${cls.color}">${formatNum(v)} <span style="font-size:11px;opacity:.7">${u}</span></div>
@@ -375,7 +520,7 @@ function renderMarkers(features){
       </div>
       <div class="popup-actions">
         <button class="popup-btn popup-btn-accent" onclick="pinStation('${locId}')">${pinnedStations.has(locId)?'✓ Pinned':'+ Pin to Compare'}</button>
-        <a class="popup-btn" href="https://waterdata.usgs.gov/monitoring-location/${sn}/" target="_blank">USGS ↗</a>
+        <a class="popup-btn" href="https://waterdata.usgs.gov/monitoring-location/${sn}/" target="_blank">USGS Page ↗</a>
       </div>
     `,{maxWidth:260});
     markersLayer.addLayer(marker);
@@ -394,24 +539,18 @@ function updateStats(features){
 }
 
 // ═══════════════════════════════════════════
-// PINNED STATIONS
+// PINNED
 // ═══════════════════════════════════════════
 let pinnedStations=new Map();
 let pinnedIdx=0;
-
 function pinStation(locId){
   if(pinnedStations.has(locId))return;
-  if(pinnedStations.size>=10){alert('Max 10 stations');return}
+  if(pinnedStations.size>=10)return;
   pinnedStations.set(locId,{color:CHART_COLORS[pinnedIdx%CHART_COLORS.length],index:pinnedIdx});
-  pinnedIdx++;
-  map.closePopup();
-  renderPinnedList();
+  pinnedIdx++;map.closePopup();renderPinnedList();
 }
-
 function unpinStation(locId){pinnedStations.delete(locId);renderPinnedList()}
-
 function clearPinned(){pinnedStations.clear();pinnedIdx=0;renderPinnedList();clearChart()}
-
 function renderPinnedList(){
   const el=document.getElementById('pinnedList');
   if(!pinnedStations.size){el.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:4px 0;">No stations pinned yet</div>';return}
@@ -427,30 +566,25 @@ function renderPinnedList(){
 // HISTORICAL + CHART
 // ═══════════════════════════════════════════
 let hydrographChart=null;
-
 function toggleChart(){
   document.getElementById('chartDrawer').classList.toggle('open');
   if(hydrographChart)setTimeout(()=>hydrographChart.resize(),350);
 }
-
 function clearChart(){
   if(hydrographChart){hydrographChart.destroy();hydrographChart=null}
   document.getElementById('chartPlaceholder').style.display='flex';
   document.getElementById('chartPlaceholder').textContent='Pin stations and click "Compare Pinned"';
   document.getElementById('chartDrawer').classList.remove('open');
 }
-
 async function fetchHistorical(){
   if(!pinnedStations.size){alert('Pin at least one station first.');return}
   const days=parseInt(document.getElementById('historyDays').value);
   const now=new Date();
   const start=new Date(now.getTime()-days*864e5);
   const dt=`${start.toISOString()}/${now.toISOString()}`;
-
   document.getElementById('chartDrawer').classList.add('open');
   const ph=document.getElementById('chartPlaceholder');
   ph.style.display='flex';ph.textContent='Fetching historical data…';
-
   const datasets=[];
   for(const[locId,info] of pinnedStations){
     setStatus(`History: ${locId}…`,true);
@@ -463,36 +597,32 @@ async function fetchHistorical(){
         const nx=(d.links||[]).find(l=>l.rel==='next');url=nx?nx.href:null;
       }
       const pts=feats.map(f=>({x:new Date(f.properties.time),y:parseFloat(f.properties.value)})).filter(p=>!isNaN(p.y)).sort((a,b)=>a.x-b.x);
-      datasets.push({label:locId,data:pts,borderColor:info.color,backgroundColor:info.color+'18',borderWidth:1.5,pointRadius:0,pointHitRadius:6,tension:.2,fill:false});
+      datasets.push({label:locId,data:pts,borderColor:info.color,backgroundColor:info.color+'15',borderWidth:1.5,pointRadius:0,pointHitRadius:6,tension:.2,fill:false});
     }catch(e){console.error(`${locId}:`,e)}
   }
   setStatus(`History loaded for ${datasets.length} station(s)`);
   renderChart(datasets,days);
 }
-
 function renderChart(datasets,days){
   const ph=document.getElementById('chartPlaceholder');
   if(!datasets.length||datasets.every(d=>!d.data.length)){ph.textContent='No data found for selected period.';ph.style.display='flex';return}
   ph.style.display='none';
   if(hydrographChart)hydrographChart.destroy();
-
+  const txtColor='#5a8a8a';
   hydrographChart=new Chart(document.getElementById('hydrograph').getContext('2d'),{
-    type:'line',
-    data:{datasets},
+    type:'line',data:{datasets},
     options:{
-      responsive:true,maintainAspectRatio:false,animation:{duration:600},
+      responsive:true,maintainAspectRatio:false,animation:{duration:500},
       interaction:{mode:'nearest',axis:'x',intersect:false},
       plugins:{
-        legend:{display:true,position:'top',labels:{color:'#d8d0e8',font:{family:"'DM Sans',sans-serif",size:11},boxWidth:10,boxHeight:10,useBorderRadius:true,borderRadius:2,padding:12}},
-        tooltip:{
-          backgroundColor:'#100e18ee',titleColor:'#d8d0e8',bodyColor:'#d8d0e8',borderColor:'#2a2440',borderWidth:1,
+        legend:{display:true,position:'top',labels:{color:'#c8e6e6',font:{family:"'DM Sans',sans-serif",size:11},boxWidth:10,boxHeight:10,useBorderRadius:true,borderRadius:2,padding:12}},
+        tooltip:{backgroundColor:'#001a1aee',titleColor:'#c8e6e6',bodyColor:'#c8e6e6',borderColor:'#003d3d',borderWidth:1,
           titleFont:{family:"'DM Sans',sans-serif",weight:'600'},bodyFont:{family:"'JetBrains Mono',monospace",size:12},padding:10,
-          callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y.toLocaleString()} cfs`}
-        }
+          callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y.toLocaleString()} cfs`}}
       },
       scales:{
-        x:{type:'time',time:{tooltipFormat:'MMM d, yyyy HH:mm',displayFormats:{hour:'MMM d HH:mm',day:'MMM d'}},ticks:{color:'#7a6f96',font:{family:"'DM Sans',sans-serif",size:10},maxTicksLimit:10},grid:{color:'#2a244020'}},
-        y:{title:{display:true,text:'Discharge (cfs)',color:'#7a6f96',font:{family:"'DM Sans',sans-serif",size:11}},ticks:{color:'#7a6f96',font:{family:"'JetBrains Mono',monospace",size:10},callback:v=>v>=1000?(v/1000)+'k':v},grid:{color:'#2a244020'}}
+        x:{type:'time',time:{tooltipFormat:'MMM d, yyyy HH:mm',displayFormats:{hour:'MMM d HH:mm',day:'MMM d'}},ticks:{color:txtColor,font:{family:"'DM Sans',sans-serif",size:10},maxTicksLimit:10},grid:{color:'#003d3d20'}},
+        y:{title:{display:true,text:'Discharge (cfs)',color:txtColor,font:{family:"'DM Sans',sans-serif",size:11}},ticks:{color:txtColor,font:{family:"'JetBrains Mono',monospace",size:10},callback:v=>v>=1000?(v/1000)+'k':v},grid:{color:'#003d3d20'}}
       }
     }
   });
